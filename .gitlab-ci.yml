@@ -62,11 +62,8 @@ unit-tests:
   stage: test
   image: alpine:latest
   before_script:
-    - apk add --no-cache helm curl tar
-    - curl -L https://github.com/helm-unittest/helm-unittest/releases/download/v0.2.8/helm-unittest-linux-amd64.tar.gz -o helm-unittest.tar.gz
-    - tar -xzf helm-unittest.tar.gz
-    - mv helm-unittest /usr/local/bin/
-    - chmod +x /usr/local/bin/helm-unittest
+    - apk add --no-cache helm curl git
+    - helm plugin install https://github.com/helm-unittest/helm-unittest
   script:
     - helm unittest --strict -f "tests/*.yaml" .
   rules:

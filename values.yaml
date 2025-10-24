@@ -109,9 +109,6 @@ linuxserver:
 
   # Additional volumes
   volumes:
-    - name: config
-      mountPath: /config
-      subPath: ""
     - name: downloads
       mountPath: /downloads
       subPath: ""
