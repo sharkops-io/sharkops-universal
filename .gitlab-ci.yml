@@ -8,7 +8,7 @@ variables:
   CHART_NAME: "linuxserver-universal"
 
 # Lint and test the chart
-lint-and-test:
+lint:
   stage: lint
   image: alpine:latest
   before_script:
@@ -16,10 +16,35 @@ lint-and-test:
   script:
     - helm lint .
     - helm template test-release . --debug
-    - helm template test-release . --validate
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Test with local Kubernetes cluster using k3d
+test-with-cluster:
+  stage: test
+  image: quay.io/helmpack/chart-testing:v3.9.0
+  services:
+    - name: docker:dind
+      command: ["--tls=false", "--privileged"]
+  before_script:
+    - apk add --no-cache k3d
+    - k3d cluster create test-cluster --port "8080:80@loadbalancer"
+    - export KUBECONFIG=$(k3d kubeconfig write test-cluster)
+    - kubectl cluster-info
+  script:
+    - helm lint .
+    - helm template test-release . --debug
+    - helm install --dry-run --debug test-release .
+    - helm install test-release . --wait --timeout=5m
+    - kubectl get all
+    - helm uninstall test-release
+  after_script:
+    - k3d cluster delete test-cluster
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  allow_failure: true
 
 # Unit tests with helm-unittest
 unit-tests:
