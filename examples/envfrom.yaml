@@ -1,0 +1,40 @@
+# Example: Using envFrom syntax (standard Kubernetes pattern)
+# This example shows how to use the common envFrom syntax for loading environment variables
+
+# Image configuration
+image:
+  repository: lscr.io/linuxserver/plex
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 32400
+  targetPort: 32400
+
+# Environment variables and secrets management
+env:
+  # Direct environment variables (key-value pairs)
+  values:
+    LOG_LEVEL: "info"
+    DEBUG: "false"
+
+# envFrom - Load all environment variables from ConfigMaps/Secrets
+# This is the standard Kubernetes envFrom syntax
+envFrom:
+  - configMapRef:
+      name: "plex-config"
+  - secretRef:
+      name: "plex-secrets"
+  - configMapRef:
+      name: "global-config"
+      optional: true  # Don't fail if ConfigMap doesn't exist
+
+# Environment variables
+env:
+  values:
+    # LinuxServer.io environment variables
+    PUID: 1000
+    PGID: 1000
+    TZ: America/New_York

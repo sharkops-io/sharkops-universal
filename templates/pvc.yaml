@@ -1,4 +1,4 @@
-{{- if .Values.persistence.enabled }}
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -16,7 +16,8 @@ spec:
   storageClassName: {{ .Values.persistence.storageClass }}
   {{- end }}
 {{- end }}
-{{- range .Values.linuxserver.volumeClaims }}
+{{- range .Values.persistence.volumes }}
+{{- if and .persistence .persistence.enabled (not .persistence.existingClaim) }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -26,11 +27,12 @@ metadata:
     {{- include "common.labels.standard" $ | nindent 4 }}
 spec:
   accessModes:
-    - {{ .accessMode }}
+    - {{ .persistence.accessMode | default "ReadWriteOnce" }}
   resources:
     requests:
-      storage: {{ .size }}
-  {{- if .storageClass }}
-  storageClassName: {{ .storageClass }}
+      storage: {{ .persistence.size }}
+  {{- if .persistence.storageClass }}
+  storageClassName: {{ .persistence.storageClass }}
   {{- end }}
+{{- end }}
 {{- end }}

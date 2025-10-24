@@ -1,4 +1,4 @@
-# Default values for linuxserver-universal
+# Default values for sharkops-universal
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -8,7 +8,7 @@ fullnameOverride: ""
 
 # Image settings
 image:
-  repository: ""  # Override this for specific LinuxServer.io images
+  repository: ""  # Override this for specific images
   tag: ""         # Override this for specific tags
   pullPolicy: IfNotPresent
   pullSecrets: []
@@ -68,11 +68,38 @@ loadBalancers: []
 
 # Persistence settings
 persistence:
-  enabled: true
+  enabled: false  # Disabled by default for generic deployments
   storageClass: ""
   accessMode: ReadWriteOnce
   size: 1Gi
   mountPath: /config
+  # existingClaim: ""  # Use existing PVC instead of creating new one
+  
+  # Additional volumes with optional persistent storage
+  # Each volume can have its own persistence configuration
+  # Leave empty for deployments that don't need additional volumes
+  volumes: []
+  
+  # Example: How to add additional volumes
+  # volumes:
+  #   - name: downloads
+  #     mountPath: /downloads
+  #     subPath: ""
+  #     persistence:
+  #       enabled: true
+  #       size: 10Gi
+  #       storageClass: "fast-ssd"
+  #       accessMode: ReadWriteOnce
+  #       # existingClaim: "my-existing-downloads-pvc"  # Use existing PVC instead
+  #   - name: media
+  #     mountPath: /media
+  #     subPath: ""
+  #     persistence:
+  #       enabled: true
+  #       size: 50Gi
+  #       storageClass: "fast-ssd"
+  #       accessMode: ReadWriteOnce
+  #       # existingClaim: "my-existing-media-pvc"  # Use existing PVC instead
 
 # Security context
 securityContext:
@@ -98,65 +125,38 @@ tolerations: []
 # Affinity
 affinity: {}
 
-# LinuxServer.io specific settings
-linuxserver:
-  # Environment variables
-  env:
-    PUID: 1000
-    PGID: 1000
-    TZ: UTC
-    # Add more environment variables as needed
+# Health checks and probes
+# These are generic Kubernetes health check configurations
+healthCheck:
+  enabled: true
+  path: /
+  port: 80
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 
-  # Additional volumes
-  volumes:
-    - name: downloads
-      mountPath: /downloads
-      subPath: ""
-    - name: media
-      mountPath: /media
-      subPath: ""
-
-  # Additional volume claims
-  volumeClaims:
-    - name: downloads
-      size: 10Gi
-      storageClass: ""
-      accessMode: ReadWriteOnce
-    - name: media
-      size: 50Gi
-      storageClass: ""
-      accessMode: ReadWriteOnce
-
-  # Health checks
-  healthCheck:
-    enabled: true
+# Liveness probe configuration
+livenessProbe:
+  enabled: true
+  httpGet:
     path: /
-    port: 80
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 
-  # Probes
-  livenessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: http
-    initialDelaySeconds: 10
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
-
-  readinessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: http
-    initialDelaySeconds: 2
-    periodSeconds: 5
-    timeoutSeconds: 3
-    failureThreshold: 3
+# Readiness probe configuration
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 2
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
 
 # Service Account
 serviceAccount:
@@ -167,4 +167,57 @@ serviceAccount:
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""
+
+# Environment variables and secrets management
+# This section allows you to manage environment variables from multiple sources
+env:
+  # Direct environment variables (key-value pairs)
+  # These will be set directly in the container
+  values:
+    # default environment variables
+    PUID: 1000
+    PGID: 1000
+    TZ: UTC
+    # Add more environment variables as needed
+    # Example:
+    # LOG_LEVEL: "info"
+    # DEBUG: "true"
+
+  # Environment variables from ConfigMaps
+  # Each entry can reference a ConfigMap and optionally specific keys
+  configMaps: []
+    # Example:
+    # - name: "app-config"  # ConfigMap name
+    #   keys: ["LOG_LEVEL", "DEBUG"]  # Optional: specific keys to include
+    # - name: "global-config"  # If no keys specified, all keys are included
+
+  # Environment variables from Secrets
+  # Each entry can reference a Secret and optionally specific keys
+  secrets: []
+    # Example:
+    # - name: "app-secrets"  # Secret name
+    #   keys: ["DB_PASSWORD", "API_KEY"]  # Optional: specific keys to include
+    # - name: "global-secrets"  # If no keys specified, all keys are included
+
+# envFrom - Load all environment variables from ConfigMaps/Secrets
+# This is the standard Kubernetes envFrom syntax
+envFrom: []
+  # Example:
+  # - configMapRef:
+  #     name: "app-config"
+  # - secretRef:
+  #     name: "app-secrets"
+  # - configMapRef:
+  #     name: "global-config"
+  #     optional: true  # Optional: don't fail if ConfigMap doesn't exist
+
+# Secret mounts
+# Mount secrets as files instead of environment variables
+secretMounts: []
+  # Example:
+  # - name: "ssl-certs"
+  #   secretName: "ssl-secret"
+  #   mountPath: "/etc/ssl/certs"
+  #   subPath: ""  # Optional: mount specific key as file
+  #   defaultMode: 0400  # Optional: file permissions
 

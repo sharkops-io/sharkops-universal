@@ -1,0 +1,79 @@
+suite: test PVC functionality
+templates:
+  - pvc.yaml
+tests:
+  - it: should create main PVC when persistence is enabled
+    set:
+      persistence:
+        enabled: true
+        size: 5Gi
+        storageClass: "fast-ssd"
+        accessMode: ReadWriteOnce
+        volumes: []  # Disable additional volumes for this test
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-sharkops-universal
+      - equal:
+          path: spec.resources.requests.storage
+          value: 5Gi
+      - equal:
+          path: spec.accessModes[0]
+          value: ReadWriteOnce
+      - equal:
+          path: spec.storageClassName
+          value: fast-ssd
+
+  - it: should not create main PVC when existingClaim is specified
+    set:
+      persistence:
+        enabled: true
+        existingClaim: "my-existing-pvc"
+        volumes: []  # Disable additional volumes for this test
+    asserts:
+      - notExists:
+          path: metadata.name
+
+  - it: should create additional volume PVC when persistence is enabled
+    set:
+      persistence:
+        enabled: false
+        volumes:
+          - name: downloads
+            mountPath: /downloads
+            persistence:
+              enabled: true
+              size: 10Gi
+              storageClass: "fast-ssd"
+              accessMode: ReadWriteOnce
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-sharkops-universal-downloads
+      - equal:
+          path: spec.resources.requests.storage
+          value: 10Gi
+      - equal:
+          path: spec.accessModes[0]
+          value: ReadWriteOnce
+      - equal:
+          path: spec.storageClassName
+          value: fast-ssd
+
+  - it: should not create additional volume PVC when existingClaim is specified
+    set:
+      persistence:
+        enabled: false
+        volumes:
+          - name: downloads
+            mountPath: /downloads
+            persistence:
+              enabled: true
+              existingClaim: "my-existing-downloads-pvc"
+    asserts:
+      - notExists:
+          path: metadata.name

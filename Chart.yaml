@@ -1,18 +1,18 @@
 apiVersion: v2
-name: linuxserver-universal
-description: A universal Helm chart for deploying LinuxServer.io Docker images
+name: sharkops-universal
+description: A universal Helm chart for deploying any Docker container
 type: application
 version: 0.1.0
 appVersion: "latest"
-home: https://gitlab.com/sharkops/helm-charts/linuxserver-universal
+home: https://gitlab.com/sharkops/helm-charts/sharkops-universal
 sources:
-  - https://gitlab.com/sharkops/helm-charts/linuxserver-universal
-  - https://www.linuxserver.io/
+  - https://gitlab.com/sharkops/helm-charts/sharkops-universal
 maintainers:
   - name: Andrew Landsverk
     email: andrew@example.com
 keywords:
-  - linuxserver
   - docker
+  - container
   - universal
   - helm
+  - kubernetes

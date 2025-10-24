@@ -27,12 +27,32 @@ ingress:
       hosts:
         - sonarr.example.com
 
+# Persistence configuration
+# Sonarr needs persistent storage for config and media libraries
 persistence:
+  # Main persistence for Sonarr configuration
   enabled: true
   storageClass: "fast-ssd"
   accessMode: ReadWriteOnce
   size: 5Gi
   mountPath: /config
+  
+  # Additional volumes for downloads and TV shows
+  volumes:
+    - name: downloads
+      mountPath: /downloads
+      persistence:
+        enabled: true
+        size: 50Gi
+        storageClass: "fast-ssd"
+        accessMode: ReadWriteOnce
+    - name: tv
+      mountPath: /tv
+      persistence:
+        enabled: true
+        size: 200Gi
+        storageClass: "fast-ssd"
+        accessMode: ReadWriteOnce
 
 securityContext:
   runAsUser: 1000
@@ -47,47 +67,32 @@ resources:
     cpu: 100m
     memory: 256Mi
 
-linuxserver:
-  env:
+# Environment variables
+env:
+  values:
+    # LinuxServer.io environment variables
     PUID: 1000
     PGID: 1000
     TZ: America/New_York
+    # Sonarr specific environment variables
     UMASK_SET: 002
 
-  volumes:
-    - name: config
-      mountPath: /config
-    - name: downloads
-      mountPath: /downloads
-    - name: tv
-      mountPath: /tv
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8989
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
 
-  volumeClaims:
-    - name: downloads
-      size: 50Gi
-      storageClass: "fast-ssd"
-      accessMode: ReadWriteOnce
-    - name: tv
-      size: 200Gi
-      storageClass: "fast-ssd"
-      accessMode: ReadWriteOnce
-
-  livenessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: 8989
-    initialDelaySeconds: 30
-    periodSeconds: 30
-    timeoutSeconds: 10
-    failureThreshold: 3
-
-  readinessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: 8989
-    initialDelaySeconds: 10
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8989
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3

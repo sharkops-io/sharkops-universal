@@ -59,12 +59,25 @@ additionalIngresses:
 
 # Note: LoadBalancer services are now configured per-port in the service.ports section above
 
+# Persistence configuration
+# Deluge needs persistent storage for config and downloads
 persistence:
+  # Main persistence for Deluge configuration
   enabled: true
   storageClass: "fast-ssd"
   accessMode: ReadWriteOnce
   size: 5Gi
   mountPath: /config
+  
+  # Additional volume for downloads
+  volumes:
+    - name: downloads
+      mountPath: /downloads
+      persistence:
+        enabled: true
+        size: 100Gi
+        storageClass: "fast-ssd"
+        accessMode: ReadWriteOnce
 
 securityContext:
   runAsUser: 1000
@@ -79,42 +92,33 @@ resources:
     cpu: 100m
     memory: 256Mi
 
-linuxserver:
-  env:
+# Environment variables
+env:
+  values:
+    # LinuxServer.io environment variables
     PUID: 1000
     PGID: 1000
     TZ: America/New_York
+    # Deluge specific environment variables
     UMASK_SET: 002
     DELUGE_LOGLEVEL: info
 
-  volumes:
-    - name: config
-      mountPath: /config
-    - name: downloads
-      mountPath: /downloads
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8112
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
 
-  volumeClaims:
-    - name: downloads
-      size: 100Gi
-      storageClass: "fast-ssd"
-      accessMode: ReadWriteOnce
-
-  livenessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: 8112
-    initialDelaySeconds: 30
-    periodSeconds: 30
-    timeoutSeconds: 10
-    failureThreshold: 3
-
-  readinessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: 8112
-    initialDelaySeconds: 10
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8112
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
