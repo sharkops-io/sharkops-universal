@@ -8,6 +8,9 @@ namespace: chart-testing
 # Release name prefix
 release-name: ct
 
+# Release label for namespace
+release-label: app.kubernetes.io/instance
+
 # Test values files
 test-values:
   - examples/plex.yaml

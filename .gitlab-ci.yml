@@ -87,7 +87,7 @@ integration-test:
   stage: test
   image: quay.io/helmpack/chart-testing:v3.9.0
   script:
-    - ct lint --all --release-label app.kubernetes.io/instance
+    - ct lint --all
     - ct install --all
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -129,12 +129,11 @@ deploy:
     - apk add --no-cache curl helm
     - helm registry login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
-    - helm package .
+    - helm package . --version $CI_COMMIT_TAG
     - CHART_FILE=$(ls *.tgz)
     - helm push $CHART_FILE oci://$CI_REGISTRY/helm
     - echo "Chart deployed successfully to GitLab Container Registry"
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
+    - if: $CI_COMMIT_TAG
   dependencies:
     - package
