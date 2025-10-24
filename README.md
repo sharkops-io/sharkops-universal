@@ -36,6 +36,32 @@ helm install my-app ./linuxserver-universal \
   --set image.tag=latest
 ```
 
+#### From GitLab Helm Repository
+
+```bash
+# Add GitLab Helm repository (public access)
+helm repo add sharkops-helm https://gitlab.com/api/v4/projects/sharkops%2Fhelm-charts%2Flinuxserver-universal/packages/helm/stable
+
+# Update repository
+helm repo update
+
+# Install from GitLab Helm repository
+helm install my-app sharkops-helm/linuxserver-universal
+
+# Install with custom values
+helm install my-app sharkops-helm/linuxserver-universal \
+  -f examples/plex.yaml
+
+# Install with custom image
+helm install my-app sharkops-helm/linuxserver-universal \
+  --set image.repository=lscr.io/linuxserver/plex \
+  --set image.tag=latest
+```
+
+**View Available Packages:**
+
+You can view all available chart versions in the [GitLab Package Registry](https://gitlab.com/sharkops/helm-charts/linuxserver-universal/-/packages/47937705).
+
 #### From GitLab Container Registry (OCI)
 
 ```bash
