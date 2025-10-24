@@ -6,6 +6,7 @@ stages:
 
 variables:
   CHART_NAME: "linuxserver-universal"
+  DOCKER_TLS_CERTDIR: ""
 
 # Lint and test the chart
 lint:
@@ -26,9 +27,9 @@ test-with-cluster:
   image: alpine:latest
   services:
     - name: docker:dind
-      command: ["--tls=false", "--privileged"]
+      command: ["--tls=false"]
   before_script:
-    - apk add --no-cache helm curl
+    - apk add --no-cache helm curl bash
     - curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
     - k3d cluster create test-cluster --port "8080:80@loadbalancer"
     - export KUBECONFIG=$(k3d kubeconfig write test-cluster)
