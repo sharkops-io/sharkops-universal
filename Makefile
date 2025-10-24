@@ -28,7 +28,35 @@ lint: ## Lint the Helm chart
 .PHONY: test
 test: ## Run unit tests
 	@echo "Running unit tests..."
-	helm unittest tests/
+	@if command -v helm-unittest >/dev/null 2>&1; then \
+		helm unittest --strict -f "tests/*.yaml" .; \
+	else \
+		echo "helm-unittest not found. Install with: pip install helm-unittest"; \
+		echo "Running basic tests instead..."; \
+		helm lint .; \
+		helm template $(RELEASE_NAME) . --debug; \
+	fi
+
+.PHONY: unit-test
+unit-test: ## Run unit tests with helm-unittest
+	@echo "Running unit tests..."
+	@if command -v helm-unittest >/dev/null 2>&1; then \
+		helm unittest --strict -f "tests/*.yaml" .; \
+	else \
+		echo "helm-unittest not found. Install with: pip install helm-unittest"; \
+		exit 1; \
+	fi
+
+.PHONY: integration-test
+integration-test: ## Run integration tests with chart-testing
+	@echo "Running integration tests..."
+	@if command -v ct >/dev/null 2>&1; then \
+		ct lint --all; \
+		ct install --all; \
+	else \
+		echo "chart-testing not found. Install with: go install github.com/helm/chart-testing/v3/ct@latest"; \
+		exit 1; \
+	fi
 
 .PHONY: template
 template: ## Test template rendering

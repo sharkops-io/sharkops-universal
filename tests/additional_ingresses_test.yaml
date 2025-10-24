@@ -1,0 +1,154 @@
+suite: test additional ingresses
+templates:
+  - additional-ingresses.yaml
+tests:
+  - it: should not create additional ingresses when empty
+    values:
+      - additionalIngresses: []
+    asserts:
+      - isEmpty
+
+  - it: should create additional ingress when enabled
+    values:
+      - additionalIngresses:
+          - name: daemon
+            enabled: true
+            className: "nginx"
+            hosts:
+              - host: daemon.example.com
+                paths:
+                  - path: /
+                    pathType: Prefix
+            port: daemon
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.name
+          value: test-linuxserver-universal-daemon
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+      - equal:
+          path: spec.rules[0].host
+          value: daemon.example.com
+
+  - it: should have correct backend service configuration
+    values:
+      - additionalIngresses:
+          - name: daemon
+            enabled: true
+            hosts:
+              - host: daemon.example.com
+                paths:
+                  - path: /
+                    pathType: Prefix
+            port: daemon
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: test-linuxserver-universal-clusterip
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.name
+          value: daemon
+
+  - it: should support TLS configuration
+    values:
+      - additionalIngresses:
+          - name: daemon
+            enabled: true
+            hosts:
+              - host: daemon.example.com
+                paths:
+                  - path: /
+                    pathType: Prefix
+            tls:
+              - secretName: daemon-tls
+                hosts:
+                  - daemon.example.com
+            port: daemon
+    asserts:
+      - isKind:
+          of: Ingress
+      - contains:
+          path: spec.tls
+          content:
+            secretName: daemon-tls
+            hosts:
+              - daemon.example.com
+
+  - it: should support annotations
+    values:
+      - additionalIngresses:
+          - name: daemon
+            enabled: true
+            annotations:
+              cert-manager.io/cluster-issuer: "letsencrypt-prod"
+              nginx.ingress.kubernetes.io/backend-protocol: "TCP"
+            hosts:
+              - host: daemon.example.com
+                paths:
+                  - path: /
+                    pathType: Prefix
+            port: daemon
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.annotations.cert-manager.io/cluster-issuer
+          value: letsencrypt-prod
+      - equal:
+          path: metadata.annotations.nginx.ingress.kubernetes.io/backend-protocol
+          value: "TCP"
+
+  - it: should have correct labels
+    values:
+      - additionalIngresses:
+          - name: daemon
+            enabled: true
+            hosts:
+              - host: daemon.example.com
+                paths:
+                  - path: /
+                    pathType: Prefix
+            port: daemon
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.labels.app.kubernetes.io/name
+          value: linuxserver-universal
+      - equal:
+          path: metadata.labels.app.kubernetes.io/instance
+          value: test
+      - equal:
+          path: metadata.labels.helm.sh/chart
+          value: linuxserver-universal-0.1.0
+
+  - it: should skip disabled additional ingresses
+    values:
+      - additionalIngresses:
+          - name: daemon
+            enabled: false
+            hosts:
+              - host: daemon.example.com
+                paths:
+                  - path: /
+                    pathType: Prefix
+            port: daemon
+          - name: api
+            enabled: true
+            hosts:
+              - host: api.example.com
+                paths:
+                  - path: /
+                    pathType: Prefix
+            port: api
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.name
+          value: test-linuxserver-universal-api

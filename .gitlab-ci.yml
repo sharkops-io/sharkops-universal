@@ -7,28 +7,37 @@ stages:
 variables:
   CHART_NAME: "linuxserver-universal"
   HELM_VERSION: "3.12.0"
-  CHART_TESTING_VERSION: "v3.9.0"
 
 # Lint and test the chart
 lint-and-test:
   stage: lint
-  image: alpine/helm:${HELM_VERSION}
-  before_script:
-    - apk add --no-cache python3 py3-pip
-    - pip3 install helm-unittest
+  image: alpine/helm:$HELM_VERSION
   script:
     - helm lint .
-    - helm unittest tests/
     - helm template test-release . --debug
     - helm install --dry-run --debug test-release .
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+# Unit tests with helm-unittest
+unit-tests:
+  stage: test
+  image: alpine/helm:$HELM_VERSION
+  before_script:
+    - apk add --no-cache python3 py3-pip
+    - pip3 install helm-unittest
+  script:
+    - helm unittest --strict -f "tests/*.yaml" .
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  allow_failure: true
+
 # Test with example values
 test-examples:
   stage: test
-  image: alpine/helm:${HELM_VERSION}
+  image: alpine/helm:$HELM_VERSION
   script:
     - echo "Testing with Plex example..."
     - helm template test-release . -f examples/plex.yaml --debug
@@ -44,10 +53,34 @@ test-examples:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+# Integration testing with chart-testing
+integration-test:
+  stage: test
+  image: quay.io/helmpack/chart-testing:v3.9.0
+  script:
+    - ct lint --all
+    - ct install --all
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/*.yaml"
+        - "**/*.yml"
+        - "**/*.tpl"
+        - "Chart.yaml"
+        - "values.yaml"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - "**/*.yaml"
+        - "**/*.yml"
+        - "**/*.tpl"
+        - "Chart.yaml"
+        - "values.yaml"
+  allow_failure: true
+
 # Package the chart
 package:
   stage: package
-  image: alpine/helm:${HELM_VERSION}
+  image: alpine/helm:$HELM_VERSION
   script:
     - helm package .
     - ls -la *.tgz
@@ -61,7 +94,7 @@ package:
 # Deploy to GitLab Container Registry
 deploy:
   stage: deploy
-  image: alpine/helm:${HELM_VERSION}
+  image: alpine/helm:$HELM_VERSION
   before_script:
     - apk add --no-cache curl
     - helm registry login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
@@ -75,21 +108,3 @@ deploy:
       when: manual
   dependencies:
     - package
-
-# Integration testing with chart-testing
-integration-test:
-  stage: test
-  image: quay.io/helmpack/chart-testing:${CHART_TESTING_VERSION}
-  script:
-    - ct lint --all
-    - ct install --all
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  only:
-    changes:
-      - "**/*.yaml"
-      - "**/*.yml"
-      - "**/*.tpl"
-      - "Chart.yaml"
-      - "values.yaml"

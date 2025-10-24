@@ -258,25 +258,66 @@ linuxserver:
 
 ## Testing
 
+The chart includes comprehensive testing capabilities:
+
 ### Unit Tests
 
 ```bash
-# Install helm-unittest
+# Run unit tests (with fallback to basic tests if helm-unittest not available)
+make test
+
+# Run unit tests with helm-unittest (requires installation)
+make unit-test
+
+# Install helm-unittest manually
 pip install helm-unittest
 
-# Run unit tests
-helm unittest tests/
+# Run unit tests directly
+helm unittest --strict -f "tests/*.yaml" .
 ```
+
+Unit tests are located in the `tests/` directory and use `helm-unittest` to validate:
+- Deployment creation and configuration
+- Service creation and port configuration  
+- Ingress creation when enabled
+- Template rendering with various values
 
 ### Integration Tests
 
 ```bash
-# Install chart-testing
+# Run integration tests with chart-testing
+make integration-test
+
+# Install chart-testing manually
 # See: https://github.com/helm/chart-testing
 
-# Run integration tests
+# Run integration tests directly
+ct lint --all
 ct install --all
 ```
+
+Integration tests use `chart-testing` to:
+- Lint all chart files
+- Test installation in a real Kubernetes environment
+- Validate against multiple Kubernetes versions
+
+### Example Testing
+
+```bash
+# Test with specific examples
+helm template test . -f examples/plex.yaml
+helm template test . -f examples/deluge.yaml
+```
+
+### CI/CD Testing
+
+The GitLab CI pipeline automatically runs:
+- **Lint**: Chart syntax and template validation
+- **Unit Tests**: helm-unittest validation (optional, with fallback)
+- **Example Tests**: All example configurations
+- **Integration Tests**: chart-testing validation (optional)
+- **Package**: Chart packaging
+- **Deploy**: OCI registry deployment (manual)
 
 ## Development
 
