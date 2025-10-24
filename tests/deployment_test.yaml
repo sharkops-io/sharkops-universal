@@ -3,15 +3,19 @@ templates:
   - deployment.yaml
 tests:
   - it: should create a deployment with correct metadata
+    set:
+      image:
+        repository: linuxserver/plex
+        tag: latest
     asserts:
       - isKind:
           of: Deployment
       - equal:
           path: metadata.name
-          value: RELEASE-NAME-linuxserver-universal
+          value: RELEASE-NAME-plex
       - equal:
           path: spec.replicas
           value: 1
       - equal:
           path: spec.template.spec.containers[0].name
-          value: linuxserver-universal
+          value: plex
