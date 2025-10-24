@@ -1,0 +1,125 @@
+# Advanced Tautulli example showing different persistence scenarios
+# This example demonstrates various persistence configurations
+
+image:
+  repository: lscr.io/linuxserver/tautulli
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8181
+      targetPort: 8181
+      protocol: TCP
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: tautulli.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: tautulli-tls
+      hosts:
+        - tautulli.example.com
+
+# Persistence configuration examples
+# Choose ONE of the following scenarios:
+
+# SCENARIO 1: Simple main persistence (recommended for most users)
+persistence:
+  enabled: true
+  storageClass: "fast-ssd"
+  accessMode: ReadWriteOnce
+  size: 5Gi
+  mountPath: /config
+  # No additional volumes needed (using default empty volumes)
+
+# SCENARIO 2: Using existing PVC (uncomment to use)
+# persistence:
+#   enabled: true
+#   existingClaim: "my-existing-tautulli-pvc"  # Use pre-existing PVC
+#   mountPath: /config
+#   volumes: []
+
+# SCENARIO 3: Custom volume configuration (uncomment to use)
+# persistence:
+#   enabled: false  # Disable main persistence
+#   volumes:
+#     - name: config
+#       mountPath: /config
+#       persistence:
+#         enabled: true
+#         size: 5Gi
+#         storageClass: "fast-ssd"
+#         accessMode: ReadWriteOnce
+#     - name: logs
+#       mountPath: /logs
+#       persistence:
+#         enabled: true
+#         size: 2Gi
+#         storageClass: "standard"
+#         accessMode: ReadWriteOnce
+
+# SCENARIO 4: Mixed existing and new PVCs (uncomment to use)
+# persistence:
+#   enabled: true
+#   existingClaim: "my-existing-config-pvc"  # Use existing for config
+#   mountPath: /config
+#   volumes:
+#     - name: logs
+#       mountPath: /logs
+#       persistence:
+#         enabled: true
+#         size: 2Gi
+#         storageClass: "standard"
+#         accessMode: ReadWriteOnce
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Environment variables
+env:
+  values:
+    # LinuxServer.io environment variables
+    PUID: 1000
+    PGID: 1000
+    TZ: America/New_York
+    # Tautulli specific environment variables
+    UMASK_SET: 002
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8181
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8181
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3

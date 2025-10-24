@@ -1,0 +1,67 @@
+# Example: Using existing PVCs
+# This example shows how to use pre-existing PVCs instead of creating new ones
+
+# Image configuration
+image:
+  repository: lscr.io/linuxserver/tautulli
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8181
+  targetPort: 8181
+
+# Persistence configuration using existing PVCs
+persistence:
+  enabled: true
+  existingClaim: "my-existing-config-pvc"  # Use existing PVC for main config
+  volumes:
+    - name: downloads
+      mountPath: /downloads
+      subPath: ""
+      persistence:
+        enabled: true
+        existingClaim: "my-existing-downloads-pvc"  # Use existing PVC
+    - name: media
+      mountPath: /media
+      subPath: ""
+      persistence:
+        enabled: true
+        existingClaim: "my-existing-media-pvc"  # Use existing PVC
+
+# Environment variables
+env:
+  values:
+    # LinuxServer.io environment variables
+    PUID: 1000
+    PGID: 1000
+    TZ: America/New_York
+    # App specific environment variables
+    UMASK_SET: 002
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8181
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8181
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+# Resources
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi

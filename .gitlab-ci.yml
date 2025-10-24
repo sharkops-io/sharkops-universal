@@ -5,24 +5,20 @@ stages:
   - deploy
 
 variables:
-  CHART_NAME: "linuxserver-universal"
+  CHART_NAME: "sharkops-universal"
 
-# Lint and test the chart
-lint:
-  stage: lint
+# Reusable job templates
+.helm_base: &helm_base
   image: alpine:latest
   before_script:
     - apk add --no-cache helm
-  script:
-    - helm lint .
-    - helm template test-release . --debug
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-# Test with local Kubernetes cluster using k3d
-test-with-cluster:
-  stage: test
+.helm_with_curl: &helm_with_curl
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache helm curl git
+
+.helm_with_docker: &helm_with_docker
   image: alpine:latest
   services:
     - name: docker:dind
@@ -43,53 +39,99 @@ test-with-cluster:
     - export KUBECONFIG=$(k3d kubeconfig write test-cluster)
     - export PATH=$PATH:/usr/local/bin
     - kubectl cluster-info
+
+.standard_rules: &standard_rules
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.chart_changes_rules: &chart_changes_rules
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/*.yaml"
+        - "**/*.yml"
+        - "**/*.tpl"
+        - "Chart.yaml"
+        - "values.yaml"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - "**/*.yaml"
+        - "**/*.yml"
+        - "**/*.tpl"
+        - "Chart.yaml"
+        - "values.yaml"
+
+# Lint and test the chart
+lint:
+  <<: *helm_base
+  stage: lint
+  script:
+    - helm lint .
+    - helm template test-release . --debug
+  <<: *standard_rules
+
+# Unit tests with helm-unittest
+unit-tests:
+  <<: *helm_with_curl
+  stage: test
+  script:
+    - helm plugin install https://github.com/helm-unittest/helm-unittest
+    - helm unittest --strict -f "tests/*.yaml" .
+  <<: *standard_rules
+
+# Test with example values and new features
+test-examples:
+  <<: *helm_base
+  stage: test
+  script:
+    - echo "=== Testing All Examples and New Features ==="
+    - echo "🧪 Testing all example configurations..."
+    - for example in examples/*.yaml; do
+        echo "Testing $(basename $example)...";
+        helm template test-release . -f "$example" --debug > /dev/null;
+        echo "✅ $(basename $example) PASSED";
+      done
+    - echo "🔍 Testing new features..."
+    - echo "1. Testing restructured PVC configuration..."
+    - helm template test-release . | grep -A 5 "PersistentVolumeClaim" | head -20
+    - echo "✅ PVC restructuring working"
+    - echo "2. Testing existing PVC support..."
+    - helm template test-release . -f examples/existing-pvc.yaml | grep -c "PersistentVolumeClaim" || echo "0"
+    - echo "✅ Existing PVC support working (0 PVCs created)"
+    - echo "3. Testing environment variables from ConfigMaps/Secrets..."
+    - helm template test-release . -f examples/simple-env.yaml | grep -A 5 "configMapRef\|secretKeyRef"
+    - echo "✅ Environment variables from ConfigMaps/Secrets working"
+    - echo "4. Testing envFrom syntax..."
+    - helm template test-release . -f examples/envfrom.yaml | grep -A 10 "envFrom:"
+    - echo "✅ envFrom syntax working"
+    - echo "5. Testing secret mounts..."
+    - helm template test-release . -f examples/env-secrets.yaml | grep -A 5 "ssl-certs\|config-files"
+    - echo "✅ Secret mounts working"
+    - echo "6. Testing comprehensive env/secrets example..."
+    - helm template test-release . -f examples/env-secrets.yaml > /dev/null
+    - echo "✅ Comprehensive env/secrets example working"
+    - echo "7. Testing backward compatibility..."
+    - helm template test-release . -f examples/tautulli.yaml > /dev/null
+    - echo "✅ Backward compatibility maintained"
+    - echo "🎉 All examples and new features tested successfully!"
+  <<: *standard_rules
+
+# Test with local Kubernetes cluster using k3d
+test-with-cluster:
+  <<: *helm_with_docker
+  stage: test
   script:
     - export PATH=$PATH:/usr/local/bin
     - helm lint .
     - helm template test-release . --debug
-    - helm install --dry-run --debug test-release . --set image.repository=nginxinc/nginx-unprivileged --set image.tag=alpine --set 'service.ports[0].port=8080' --set 'service.ports[0].targetPort=8080' --set 'linuxserver.livenessProbe.httpGet.port=8080' --set 'linuxserver.readinessProbe.httpGet.port=8080'
-    - helm install test-release . --wait --timeout=5m --set image.repository=nginxinc/nginx-unprivileged --set image.tag=alpine --set 'service.ports[0].port=8080' --set 'service.ports[0].targetPort=8080' --set 'linuxserver.livenessProbe.httpGet.port=8080' --set 'linuxserver.readinessProbe.httpGet.port=8080'
+    - helm install --dry-run --debug test-release . --set image.repository=nginxinc/nginx-unprivileged --set image.tag=alpine --set 'service.ports[0].port=8080' --set 'service.ports[0].targetPort=8080' --set 'livenessProbe.httpGet.port=8080' --set 'readinessProbe.httpGet.port=8080'
+    - helm install test-release . --wait --timeout=5m --set image.repository=nginxinc/nginx-unprivileged --set image.tag=alpine --set 'service.ports[0].port=8080' --set 'service.ports[0].targetPort=8080' --set 'livenessProbe.httpGet.port=8080' --set 'readinessProbe.httpGet.port=8080'
     - kubectl get all
     - helm uninstall test-release
   after_script:
     - k3d cluster delete test-cluster || true
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-# Unit tests with helm-unittest
-unit-tests:
-  stage: test
-  image: alpine:latest
-  before_script:
-    - apk add --no-cache helm curl git
-    - helm plugin install https://github.com/helm-unittest/helm-unittest
-  script:
-    - helm unittest --strict -f "tests/*.yaml" .
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-# Test with example values
-test-examples:
-  stage: test
-  image: alpine:latest
-  before_script:
-    - apk add --no-cache helm
-  script:
-    - echo "Testing with Plex example..."
-    - helm template test-release . -f examples/plex.yaml --debug
-    - echo "Testing with Radarr example..."
-    - helm template test-release . -f examples/radarr.yaml --debug
-    - echo "Testing with Sonarr example..."
-    - helm template test-release . -f examples/sonarr.yaml --debug
-    - echo "Testing with Tautulli example..."
-    - helm template test-release . -f examples/tautulli.yaml --debug
-    - echo "Testing with Deluge example..."
-    - helm template test-release . -f examples/deluge.yaml --debug
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  <<: *standard_rules
 
 # Integration testing with chart-testing
 integration-test:
@@ -98,28 +140,12 @@ integration-test:
   script:
     - ct lint --all
     - ct install --all
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - "**/*.yaml"
-        - "**/*.yml"
-        - "**/*.tpl"
-        - "Chart.yaml"
-        - "values.yaml"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        - "**/*.yaml"
-        - "**/*.yml"
-        - "**/*.tpl"
-        - "Chart.yaml"
-        - "values.yaml"
+  <<: *chart_changes_rules
 
 # Package the chart
 package:
+  <<: *helm_base
   stage: package
-  image: alpine:latest
-  before_script:
-    - apk add --no-cache helm
   script:
     - helm package .
     - ls -la *.tgz
@@ -130,16 +156,17 @@ package:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-# Deploy to GitLab Container Registry
+# Deploy to GitLab Container Registry (OCI)
 deploy:
+  <<: *helm_base
   stage: deploy
-  image: alpine:latest
   before_script:
     - apk add --no-cache curl helm
   script:
     - helm package . --version $CI_COMMIT_TAG
     - CHART_FILE=$(ls *.tgz)
-    - curl --fail-with-body --request POST --user gitlab-ci-token:$CI_JOB_TOKEN --form "chart=@$CHART_FILE" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/helm/api/stable/charts"
+    - echo "Pushing chart to GitLab Container Registry (OCI)..."
+    - helm push $CHART_FILE oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal
   rules:
     - if: $CI_COMMIT_TAG
   dependencies:

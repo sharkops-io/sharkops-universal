@@ -1,21 +1,23 @@
-# LinuxServer.io Universal Helm Chart
+# SharkOps Universal Helm Chart
 
-A universal Helm chart for deploying LinuxServer.io Docker images on Kubernetes. This chart provides a consistent and reusable deployment pattern for all LinuxServer.io applications.
+A universal Helm chart for deploying any Docker container on Kubernetes. This chart provides a consistent and reusable deployment pattern for any containerized application.
 
 ## Features
 
-- **Universal Design**: Deploy any LinuxServer.io Docker image with minimal configuration
+- **Universal Design**: Deploy any Docker container with minimal configuration
 - **Self-Contained**: No external dependencies, uses custom templates for maximum flexibility
 - **Flexible Configuration**: Support for multiple volumes, environment variables, and probes
 - **Security First**: Proper security contexts and user/group management
 - **Production Ready**: Includes health checks, resource limits, and ingress support
 - **Comprehensive Testing**: Unit tests and integration tests included
+- **Environment Management**: Support for ConfigMaps, Secrets, and envFrom
+- **Persistence Options**: Flexible volume management with existing PVC support
 
 ## Prerequisites
 
 - Kubernetes 1.19+
 - Helm 3.0+
-- Persistent volume support (for data persistence)
+- (optional) Persistent volume support (for data persistence)
 
 ## Installation
 
@@ -25,55 +27,89 @@ A universal Helm chart for deploying LinuxServer.io Docker images on Kubernetes.
 
 ```bash
 # Install with default values
-helm install my-app ./linuxserver-universal
+helm install my-app ./sharkops-universal
 
 # Install with custom values
-helm install my-app ./linuxserver-universal -f examples/plex.yaml
+helm install my-app ./sharkops-universal -f examples/plex.yaml
 
 # Install with custom image
-helm install my-app ./linuxserver-universal \
-  --set image.repository=lscr.io/linuxserver/plex \
-  --set image.tag=latest
+helm install my-app ./sharkops-universal \
+  --set image.repository=nginxinc/nginx-unprivileged \
+  --set image.tag=alpine
 ```
 
 #### From GitLab Helm Repository
 
 ```bash
 # Add GitLab Helm repository (public access)
-helm repo add sharkops-helm https://gitlab.com/api/v4/projects/sharkops%2Fhelm-charts%2Flinuxserver-universal/packages/helm/stable
+helm repo add sharkops-helm https://gitlab.com/api/v4/projects/sharkops%2Fhelm-charts%2Fsharkops-universal/packages/helm/stable
 
 # Update repository
 helm repo update
 
 # Install from GitLab Helm repository
-helm install my-app sharkops-helm/linuxserver-universal
+helm install my-app sharkops-helm/sharkops-universal
 
 # Install with custom values
-helm install my-app sharkops-helm/linuxserver-universal \
+helm install my-app sharkops-helm/sharkops-universal \
   -f examples/plex.yaml
 
 # Install with custom image
-helm install my-app sharkops-helm/linuxserver-universal \
-  --set image.repository=lscr.io/linuxserver/plex \
-  --set image.tag=latest
+helm install my-app sharkops-helm/sharkops-universal \
+  --set image.repository=nginxinc/nginx-unprivileged \
+  --set image.tag=alpine
 ```
 
 **View Available Packages:**
 
-You can view all available chart versions in the [GitLab Package Registry](https://gitlab.com/sharkops/helm-charts/linuxserver-universal/-/packages/47937705).
+You can view all available chart versions in the [GitLab Package Registry](https://gitlab.com/sharkops/helm-charts/sharkops-universal/-/packages).
 
-#### From GitLab Container Registry (OCI)
+#### From GitLab Container Registry (OCI) - Recommended
+
+The OCI registry approach is the modern, recommended way to distribute Helm charts:
 
 ```bash
-# Add GitLab registry
+# Login to GitLab Container Registry (requires authentication)
 helm registry login registry.gitlab.com
 
-# Install from OCI registry
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/linuxserver-universal
+# Install latest version from OCI registry
+helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal
+
+# Install specific version
+helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal --version 1.0.0
 
 # Install with custom values
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/linuxserver-universal \
+helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal \
   -f examples/plex.yaml
+
+# Install with custom values and specific version
+helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal \
+  --version 1.0.0 \
+  -f examples/plex.yaml
+
+# Pull chart for inspection
+helm pull oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal --version 1.0.0
+
+# List available versions (requires authentication)
+helm show chart oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal
+```
+
+**Benefits of OCI Registry:**
+- ✅ Modern standard for container and Helm chart distribution
+- ✅ Better security and authentication
+- ✅ Direct chart access without repository management
+- ✅ Version-specific pulls
+- ✅ Works with any OCI-compatible registry
+
+**Authentication:** OCI registry requires authentication. You'll need to provide credentials when prompted by `helm registry login`.
+
+**Pro Tip:** You can create an alias for easier usage:
+```bash
+# Add to your shell profile (.bashrc, .zshrc, etc.)
+alias sharkops-chart='oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal'
+
+# Then use it like this:
+helm install my-app sharkops-chart --version 1.0.0
 ```
 
 ## Configuration
@@ -82,7 +118,7 @@ helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/linuxserver-u
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `image.repository` | LinuxServer.io image repository | `""` |
+| `image.repository` | Docker image repository | `""` |
 | `image.tag` | Image tag | `""` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 
@@ -110,8 +146,11 @@ When ports have different service types, separate Kubernetes services are create
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `ingress.enabled` | Enable ingress | `false` |
+| `ingress.className` | Ingress class name | `""` |
+| `ingress.annotations` | Ingress annotations | `{}` |
+| `ingress.hosts` | Ingress hosts | `[]` |
+| `ingress.tls` | Ingress TLS configuration | `[]` |
 | `additionalIngresses` | Additional ingress resources for other ports | `[]` |
-| `loadBalancers` | LoadBalancer services for additional ports (deprecated - use per-port types) | `[]` |
 
 ### Persistence Configuration
 
@@ -120,22 +159,231 @@ When ports have different service types, separate Kubernetes services are create
 | `persistence.enabled` | Enable persistence | `true` |
 | `persistence.size` | Storage size | `1Gi` |
 | `persistence.mountPath` | Mount path | `/config` |
+| `persistence.storageClass` | Storage class | `""` (uses default) |
+| `persistence.accessMode` | Access mode | `ReadWriteOnce` |
+| `persistence.existingClaim` | Use existing PVC | `""` (creates new PVC) |
+| `persistence.volumes` | Additional volumes with persistence | `[]` |
 
-### LinuxServer.io Specific Configuration
+#### Additional Volumes
+
+Each volume in `persistence.volumes` can have its own persistence configuration:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `linuxserver.env.PUID` | User ID | `1000` |
-| `linuxserver.env.PGID` | Group ID | `1000` |
-| `linuxserver.env.TZ` | Timezone | `UTC` |
-| `linuxserver.volumes` | Additional volumes | `[]` |
-| `linuxserver.volumeClaims` | Additional PVCs | `[]` |
-| `linuxserver.livenessProbe.enabled` | Enable liveness probe | `true` |
-| `linuxserver.readinessProbe.enabled` | Enable readiness probe | `true` |
+| `persistence.volumes[].name` | Volume name | Required |
+| `persistence.volumes[].mountPath` | Mount path | Required |
+| `persistence.volumes[].subPath` | Sub path | `""` |
+| `persistence.volumes[].persistence.enabled` | Enable persistence for this volume | `false` |
+| `persistence.volumes[].persistence.size` | Storage size | Required if enabled |
+| `persistence.volumes[].persistence.storageClass` | Storage class | `""` (uses default) |
+| `persistence.volumes[].persistence.accessMode` | Access mode | `ReadWriteOnce` |
+| `persistence.volumes[].persistence.existingClaim` | Use existing PVC | `""` (creates new PVC) |
+
+### Environment Variables and Secrets
+
+The chart supports multiple ways to manage environment variables and secrets:
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `env.values` | Direct environment variables (key-value pairs) | `{}` |
+| `env.configMaps` | Environment variables from ConfigMaps | `[]` |
+| `env.secrets` | Environment variables from Secrets | `[]` |
+| `envFrom` | Load all environment variables from ConfigMaps/Secrets (standard Kubernetes syntax) | `[]` |
+| `secretMounts` | Mount secrets as files | `[]` |
+
+#### Direct Environment Variables
+
+Set environment variables directly in values.yaml:
+
+```yaml
+env:
+  values:
+    LOG_LEVEL: "info"
+    DEBUG: "true"
+    APP_MODE: "production"
+    PUID: 1000
+    PGID: 1000
+    TZ: "UTC"
+```
+
+#### Environment Variables from ConfigMaps
+
+Reference ConfigMaps for environment variables:
+
+```yaml
+env:
+  configMaps:
+    - name: "app-config"  # All keys from this ConfigMap
+    - name: "global-config"
+      keys: ["GLOBAL_SETTING", "FEATURE_FLAG"]  # Specific keys only
+```
+
+#### Environment Variables from Secrets
+
+Reference Secrets for environment variables:
+
+```yaml
+env:
+  secrets:
+    - name: "app-secrets"
+      keys: ["DB_PASSWORD", "API_KEY"]  # Specific keys only
+    - name: "global-secrets"  # All keys from this Secret
+```
+
+#### envFrom (Standard Kubernetes Syntax)
+
+Use the standard Kubernetes `envFrom` syntax to load all environment variables from ConfigMaps/Secrets:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: "app-config"
+  - secretRef:
+      name: "app-secrets"
+  - configMapRef:
+      name: "global-config"
+      optional: true  # Don't fail if ConfigMap doesn't exist
+```
+
+This is the most efficient way to load all environment variables from a ConfigMap or Secret at once.
+
+#### Secret Mounts
+
+Mount secrets as files instead of environment variables:
+
+```yaml
+secretMounts:
+  - name: "ssl-certs"
+    secretName: "ssl-secret"
+    mountPath: "/etc/ssl/certs"
+    defaultMode: 0400
+  - name: "config-files"
+    secretName: "app-config-secret"
+    mountPath: "/etc/app/config"
+    subPath: "config.yaml"  # Mount specific key as file
+    defaultMode: 0600
+```
+
+### Health Checks and Probes
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `livenessProbe.enabled` | Enable liveness probe | `true` |
+| `livenessProbe.httpGet.path` | HTTP path for liveness check | `/` |
+| `livenessProbe.httpGet.port` | HTTP port for liveness check | `http` |
+| `livenessProbe.initialDelaySeconds` | Initial delay before first check | `10` |
+| `livenessProbe.periodSeconds` | Check interval | `10` |
+| `livenessProbe.timeoutSeconds` | Check timeout | `5` |
+| `livenessProbe.failureThreshold` | Failure threshold | `3` |
+| `readinessProbe.enabled` | Enable readiness probe | `true` |
+| `readinessProbe.httpGet.path` | HTTP path for readiness check | `/` |
+| `readinessProbe.httpGet.port` | HTTP port for readiness check | `http` |
+| `readinessProbe.initialDelaySeconds` | Initial delay before first check | `2` |
+| `readinessProbe.periodSeconds` | Check interval | `5` |
+| `readinessProbe.timeoutSeconds` | Check timeout | `3` |
+| `readinessProbe.failureThreshold` | Failure threshold | `3` |
+
+### Security Context
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `securityContext.runAsUser` | User ID to run as | `1000` |
+| `securityContext.runAsGroup` | Group ID to run as | `1000` |
+| `securityContext.fsGroup` | File system group | `1000` |
+
+### Resources
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `resources.limits.cpu` | CPU limit | `500m` |
+| `resources.limits.memory` | Memory limit | `512Mi` |
+| `resources.requests.cpu` | CPU request | `100m` |
+| `resources.requests.memory` | Memory request | `128Mi` |
+
+## Using Existing PVCs
+
+You can use pre-existing PVCs instead of creating new ones. This is useful when you have manually created PVCs or want to share storage between deployments.
+
+### Main Persistence with Existing PVC
+
+```yaml
+persistence:
+  enabled: true
+  existingClaim: "my-existing-config-pvc"  # Use existing PVC
+```
+
+### Additional Volumes with Existing PVCs
+
+```yaml
+persistence:
+  volumes:
+    - name: downloads
+      mountPath: /downloads
+      persistence:
+        enabled: true
+        existingClaim: "my-existing-downloads-pvc"  # Use existing PVC
+    - name: media
+      mountPath: /media
+      persistence:
+        enabled: true
+        existingClaim: "my-existing-media-pvc"  # Use existing PVC
+```
+
+### Mixed Configuration
+
+You can mix existing PVCs with new ones:
+
+```yaml
+persistence:
+  enabled: true
+  existingClaim: "my-existing-config-pvc"  # Use existing PVC for main config
+  volumes:
+    - name: downloads
+      mountPath: /downloads
+      persistence:
+        enabled: true
+        size: 10Gi  # Create new PVC for downloads
+    - name: media
+      mountPath: /media
+      persistence:
+        enabled: true
+        existingClaim: "my-existing-media-pvc"  # Use existing PVC for media
+```
 
 ## Examples
 
-### Plex Media Server
+### Nginx (Generic Container)
+
+```yaml
+image:
+  repository: nginxinc/nginx-unprivileged
+  tag: alpine
+
+service:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+
+env:
+  values:
+    NGINX_ENTRYPOINT_QUIET_LOGS: "1"
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8080
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8080
+```
+
+### Plex Media Server (LinuxServer.io)
 
 ```yaml
 image:
@@ -148,6 +396,7 @@ service:
       port: 32400
       targetPort: 32400
       protocol: TCP
+
 ingress:
   enabled: true
   hosts:
@@ -156,20 +405,44 @@ ingress:
         - path: /
           pathType: Prefix
 
-linuxserver:
-  env:
+persistence:
+  enabled: true
+  size: 10Gi
+  mountPath: /config
+  volumes:
+    - name: downloads
+      mountPath: /downloads
+      persistence:
+        enabled: true
+        size: 100Gi
+    - name: media
+      mountPath: /media
+      persistence:
+        enabled: true
+        size: 500Gi
+
+env:
+  values:
     PUID: 1000
     PGID: 1000
     TZ: America/New_York
+    VERSION: docker
     PLEX_CLAIM: "claim-xxxxxxxxxxxxxxxxxxxx"
-  volumeClaims:
-    - name: downloads
-      size: 100Gi
-    - name: media
-      size: 500Gi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /web
+    port: 32400
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /web
+    port: 32400
 ```
 
-### Radarr
+### Radarr (LinuxServer.io)
 
 ```yaml
 image:
@@ -182,6 +455,7 @@ service:
       port: 7878
       targetPort: 7878
       protocol: TCP
+
 ingress:
   enabled: true
   hosts:
@@ -190,19 +464,43 @@ ingress:
         - path: /
           pathType: Prefix
 
-linuxserver:
-  env:
+persistence:
+  enabled: true
+  size: 5Gi
+  mountPath: /config
+  volumes:
+    - name: downloads
+      mountPath: /downloads
+      persistence:
+        enabled: true
+        size: 50Gi
+    - name: movies
+      mountPath: /movies
+      persistence:
+        enabled: true
+        size: 200Gi
+
+env:
+  values:
     PUID: 1000
     PGID: 1000
     TZ: America/New_York
-  volumeClaims:
-    - name: downloads
-      size: 50Gi
-    - name: movies
-      size: 200Gi
+    UMASK_SET: 002
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 7878
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 7878
 ```
 
-### Tautulli
+### Tautulli (LinuxServer.io)
 
 ```yaml
 image:
@@ -215,6 +513,7 @@ service:
       port: 8181
       targetPort: 8181
       protocol: TCP
+
 ingress:
   enabled: true
   hosts:
@@ -223,14 +522,33 @@ ingress:
         - path: /
           pathType: Prefix
 
-linuxserver:
-  env:
+persistence:
+  enabled: true
+  size: 5Gi
+  mountPath: /config
+  volumes: []
+
+env:
+  values:
     PUID: 1000
     PGID: 1000
     TZ: America/New_York
+    UMASK_SET: 002
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8181
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8181
 ```
 
-### Deluge
+### Deluge (LinuxServer.io)
 
 ```yaml
 image:
@@ -252,6 +570,7 @@ service:
       targetPort: 58946
       protocol: TCP
       type: LoadBalancer  # This port gets its own LoadBalancer service
+
 ingress:
   enabled: true
   hosts:
@@ -259,6 +578,7 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+
 # Additional ingress for daemon port
 additionalIngresses:
   - name: daemon
@@ -271,15 +591,36 @@ additionalIngresses:
             pathType: Prefix
     port: daemon  # Port name from service
 
-linuxserver:
-  env:
+persistence:
+  enabled: true
+  size: 5Gi
+  mountPath: /config
+  volumes:
+    - name: downloads
+      mountPath: /downloads
+      persistence:
+        enabled: true
+        size: 100Gi
+
+env:
+  values:
     PUID: 1000
     PGID: 1000
     TZ: America/New_York
+    UMASK_SET: 002
     DELUGE_LOGLEVEL: info
-  volumeClaims:
-    - name: downloads
-      size: 100Gi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8112
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8112
 ```
 
 ## Testing
@@ -289,37 +630,29 @@ The chart includes comprehensive testing capabilities:
 ### Unit Tests
 
 ```bash
-# Run unit tests (with fallback to basic tests if helm-unittest not available)
-make test
-
-# Run unit tests with helm-unittest (requires installation)
-make unit-test
-
-# Install helm-unittest manually
-pip install helm-unittest
-
-# Run unit tests directly
+# Run unit tests
 helm unittest --strict -f "tests/*.yaml" .
+
+# Install helm-unittest if needed
+helm plugin install https://github.com/helm-unittest/helm-unittest
 ```
 
 Unit tests are located in the `tests/` directory and use `helm-unittest` to validate:
 - Deployment creation and configuration
 - Service creation and port configuration  
-- Ingress creation when enabled
+- PVC creation and existing claim support
+- Environment variable and secret management
 - Template rendering with various values
 
 ### Integration Tests
 
 ```bash
 # Run integration tests with chart-testing
-make integration-test
+ct lint --all
+ct install --all
 
 # Install chart-testing manually
 # See: https://github.com/helm/chart-testing
-
-# Run integration tests directly
-ct lint --all
-ct install --all
 ```
 
 Integration tests use `chart-testing` to:
@@ -332,18 +665,19 @@ Integration tests use `chart-testing` to:
 ```bash
 # Test with specific examples
 helm template test . -f examples/plex.yaml
-helm template test . -f examples/deluge.yaml
+helm template test . -f examples/nginx.yaml
+helm template test . -f examples/env-secrets.yaml
 ```
 
 ### CI/CD Testing
 
 The GitLab CI pipeline automatically runs:
 - **Lint**: Chart syntax and template validation
-- **Unit Tests**: helm-unittest validation (optional, with fallback)
+- **Unit Tests**: helm-unittest validation
 - **Example Tests**: All example configurations
-- **Integration Tests**: chart-testing validation (optional)
+- **Integration Tests**: chart-testing validation
 - **Package**: Chart packaging
-- **Deploy**: OCI registry deployment (manual)
+- **Deploy**: OCI registry deployment
 
 ## Development
 
@@ -357,7 +691,7 @@ The GitLab CI pipeline automatically runs:
 
 ```bash
 # Unit tests
-helm unittest tests/
+helm unittest --strict -f "tests/*.yaml" .
 
 # Lint
 helm lint .
@@ -380,9 +714,9 @@ This chart includes GitLab CI configuration for:
 
 ## Repository
 
-- **Source Code**: [https://gitlab.com/sharkops/helm-charts/linuxserver-universal](https://gitlab.com/sharkops/helm-charts/linuxserver-universal)
-- **Issues**: [GitLab Issues](https://gitlab.com/sharkops/helm-charts/linuxserver-universal/-/issues)
-- **Merge Requests**: [GitLab Merge Requests](https://gitlab.com/sharkops/helm-charts/linuxserver-universal/-/merge_requests)
+- **Source Code**: [https://gitlab.com/sharkops/helm-charts/sharkops-universal](https://gitlab.com/sharkops/helm-charts/sharkops-universal)
+- **Issues**: [GitLab Issues](https://gitlab.com/sharkops/helm-charts/sharkops-universal/-/issues)
+- **Merge Requests**: [GitLab Merge Requests](https://gitlab.com/sharkops/helm-charts/sharkops-universal/-/merge_requests)
 
 ## Contributing
 
@@ -399,5 +733,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- [LinuxServer.io](https://www.linuxserver.io/) for providing excellent Docker images
 - The Kubernetes and Helm communities
+- All the container image maintainers who make this possible

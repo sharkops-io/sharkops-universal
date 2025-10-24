@@ -1,0 +1,33 @@
+# Example: Simple environment variables and secrets usage
+# This example shows basic usage of environment variables and secrets
+
+# Image configuration
+image:
+  repository: lscr.io/linuxserver/plex
+  tag: latest
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 32400
+  targetPort: 32400
+
+# Environment variables and secrets management
+env:
+  # Direct environment variables
+  values:
+    LOG_LEVEL: "info"
+    DEBUG: "false"
+    # LinuxServer.io environment variables
+    PUID: 1000
+    PGID: 1000
+    TZ: America/New_York
+
+  # Environment variables from a ConfigMap
+  configMaps:
+    - name: "plex-config"
+
+  # Environment variables from a Secret
+  secrets:
+    - name: "plex-secrets"
+      keys: ["PLEX_TOKEN", "PLEX_PASSWORD"]

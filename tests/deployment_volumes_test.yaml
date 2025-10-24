@@ -1,0 +1,50 @@
+suite: test deployment volume functionality
+templates:
+  - deployment.yaml
+tests:
+  - it: should use existing claims in deployment when specified
+    set:
+      persistence:
+        enabled: true
+        existingClaim: "my-existing-config-pvc"
+        volumes:
+          - name: downloads
+            mountPath: /downloads
+            persistence:
+              enabled: true
+              existingClaim: "my-existing-downloads-pvc"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: config
+            persistentVolumeClaim:
+              claimName: my-existing-config-pvc
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: downloads
+            persistentVolumeClaim:
+              claimName: my-existing-downloads-pvc
+
+  - it: should create secret mounts when specified
+    set:
+      secretMounts:
+        - name: "ssl-certs"
+          secretName: "ssl-secret"
+          mountPath: "/etc/ssl/certs"
+          defaultMode: 0400
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: ssl-certs
+            mountPath: "/etc/ssl/certs"
+            defaultMode: 256
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: ssl-certs
+            secret:
+              secretName: ssl-secret
+              defaultMode: 256

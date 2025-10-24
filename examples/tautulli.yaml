@@ -1,4 +1,6 @@
-# Example values for Tautulli
+# Simple Tautulli example
+# This is a clean, straightforward configuration for Tautulli
+
 image:
   repository: lscr.io/linuxserver/tautulli
   tag: latest
@@ -27,12 +29,15 @@ ingress:
       hosts:
         - tautulli.example.com
 
+# Persistence configuration
+# Tautulli needs persistent storage for its configuration and database
 persistence:
   enabled: true
   storageClass: "fast-ssd"
   accessMode: ReadWriteOnce
   size: 5Gi
   mountPath: /config
+  # No additional volumes needed for basic Tautulli setup
 
 securityContext:
   runAsUser: 1000
@@ -47,33 +52,32 @@ resources:
     cpu: 100m
     memory: 256Mi
 
-linuxserver:
-  env:
+# Environment variables
+env:
+  values:
+    # LinuxServer.io environment variables
     PUID: 1000
     PGID: 1000
     TZ: America/New_York
+    # Tautulli specific environment variables
     UMASK_SET: 002
 
-  volumes:
-    - name: config
-      mountPath: /config
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8181
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
 
-  livenessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: 8181
-    initialDelaySeconds: 30
-    periodSeconds: 30
-    timeoutSeconds: 10
-    failureThreshold: 3
-
-  readinessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: 8181
-    initialDelaySeconds: 10
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 8181
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3

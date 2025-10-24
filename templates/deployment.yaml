@@ -26,39 +26,77 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            {{- range $key, $value := .Values.linuxserver.env }}
+            {{- range $key, $value := .Values.env.values }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- range .Values.env.configMaps }}
+            {{- if .keys }}
+            {{- $configMapName := .name }}
+            {{- range .keys }}
+            - name: {{ . }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $configMapName }}
+                  key: {{ . }}
+            {{- end }}
+            {{- else }}
+            - name: {{ .name }}
+              valueFrom:
+                configMapRef:
+                  name: {{ .name }}
+            {{- end }}
+            {{- end }}
+            {{- range .Values.env.secrets }}
+            {{- if .keys }}
+            {{- $secretName := .name }}
+            {{- range .keys }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ . }}
+            {{- end }}
+            {{- else }}
+            - name: {{ .name }}
+              valueFrom:
+                secretRef:
+                  name: {{ .name }}
+            {{- end }}
+            {{- end }}
+          {{- if .Values.envFrom }}
+          envFrom:
+            {{- toYaml .Values.envFrom | nindent 12 }}
+          {{- end }}
           ports:
             {{- range .Values.service.ports }}
             - name: {{ .name }}
               containerPort: {{ .targetPort }}
               protocol: {{ .protocol }}
             {{- end }}
-          {{- if .Values.linuxserver.livenessProbe.enabled }}
+          {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
-            {{- if .Values.linuxserver.livenessProbe.httpGet }}
+            {{- if .Values.livenessProbe.httpGet }}
             httpGet:
-              path: {{ .Values.linuxserver.livenessProbe.httpGet.path }}
-              port: {{ .Values.linuxserver.livenessProbe.httpGet.port }}
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.livenessProbe.httpGet.port }}
             {{- end }}
-            initialDelaySeconds: {{ .Values.linuxserver.livenessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.linuxserver.livenessProbe.periodSeconds }}
-            timeoutSeconds: {{ .Values.linuxserver.livenessProbe.timeoutSeconds }}
-            failureThreshold: {{ .Values.linuxserver.livenessProbe.failureThreshold }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
           {{- end }}
-          {{- if .Values.linuxserver.readinessProbe.enabled }}
+          {{- if .Values.readinessProbe.enabled }}
           readinessProbe:
-            {{- if .Values.linuxserver.readinessProbe.httpGet }}
+            {{- if .Values.readinessProbe.httpGet }}
             httpGet:
-              path: {{ .Values.linuxserver.readinessProbe.httpGet.path }}
-              port: {{ .Values.linuxserver.readinessProbe.httpGet.port }}
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.readinessProbe.httpGet.port }}
             {{- end }}
-            initialDelaySeconds: {{ .Values.linuxserver.readinessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.linuxserver.readinessProbe.periodSeconds }}
-            timeoutSeconds: {{ .Values.linuxserver.readinessProbe.timeoutSeconds }}
-            failureThreshold: {{ .Values.linuxserver.readinessProbe.failureThreshold }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
@@ -67,23 +105,43 @@ spec:
             - name: config
               mountPath: {{ .Values.persistence.mountPath }}
             {{- end }}
-            {{- range .Values.linuxserver.volumes }}
+            {{- range .Values.persistence.volumes }}
             - name: {{ .name }}
               mountPath: {{ .mountPath }}
               {{- if .subPath }}
               subPath: {{ .subPath }}
               {{- end }}
             {{- end }}
+            {{- range .Values.secretMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+              {{- if .defaultMode }}
+              defaultMode: {{ .defaultMode }}
+              {{- end }}
+            {{- end }}
       volumes:
         {{- if .Values.persistence.enabled }}
         - name: config
           persistentVolumeClaim:
-            claimName: {{ include "common.names.fullname" . }}
+            claimName: {{ .Values.persistence.existingClaim | default (include "common.names.fullname" .) }}
         {{- end }}
-        {{- range .Values.linuxserver.volumeClaims }}
+        {{- range .Values.persistence.volumes }}
+        {{- if and .persistence .persistence.enabled }}
         - name: {{ .name }}
           persistentVolumeClaim:
-            claimName: {{ include "common.names.fullname" $ }}-{{ .name }}
+            claimName: {{ .persistence.existingClaim | default (printf "%s-%s" (include "common.names.fullname" $) .name) }}
+        {{- end }}
+        {{- end }}
+        {{- range .Values.secretMounts }}
+        - name: {{ .name }}
+          secret:
+            secretName: {{ .secretName }}
+            {{- if .defaultMode }}
+            defaultMode: {{ .defaultMode }}
+            {{- end }}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
