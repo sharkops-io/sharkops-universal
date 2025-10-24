@@ -1,0 +1,12 @@
+suite: test values
+templates:
+  - deployment.yaml
+tests:
+  - it: should be a Deployment with values
+    values:
+      - image:
+          repository: test
+          tag: latest
+    asserts:
+      - isKind:
+          of: Deployment

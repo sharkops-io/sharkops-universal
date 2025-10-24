@@ -1,0 +1,11 @@
+suite: test values correct
+templates:
+  - deployment.yaml
+tests:
+  - it: should be a Deployment with values
+    set:
+      image.repository: test
+      image.tag: latest
+    asserts:
+      - isKind:
+          of: Deployment

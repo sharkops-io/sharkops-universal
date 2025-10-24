@@ -47,8 +47,8 @@ test-with-cluster:
     - export PATH=$PATH:/usr/local/bin
     - helm lint .
     - helm template test-release . --debug
-    - helm install --dry-run --debug test-release .
-    - helm install test-release . --wait --timeout=5m
+    - helm install --dry-run --debug test-release . --set image.repository=nginx --set image.tag=alpine
+    - helm install test-release . --wait --timeout=5m --set image.repository=nginx --set image.tag=alpine
     - kubectl get all
     - helm uninstall test-release
   after_script:

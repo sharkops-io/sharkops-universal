@@ -1,0 +1,10 @@
+suite: test isEmpty
+templates:
+  - additional-ingresses.yaml
+tests:
+  - it: should not create additional ingresses when empty
+    set:
+      additionalIngresses: []
+    asserts:
+      - isEmpty:
+          path: .

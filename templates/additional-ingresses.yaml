@@ -1,3 +1,4 @@
+{{- if and .Values.additionalIngresses (gt (len .Values.additionalIngresses) 0) }}
 {{- range .Values.additionalIngresses }}
 {{- if .enabled }}
 {{- $port := .port }}
@@ -59,5 +60,6 @@ spec:
                 {{- end }}
           {{- end }}
     {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
