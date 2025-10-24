@@ -23,12 +23,12 @@ lint:
 # Test with local Kubernetes cluster using k3d
 test-with-cluster:
   stage: test
-  image: quay.io/helmpack/chart-testing:v3.9.0
+  image: rancher/k3d:v5.4.6
   services:
     - name: docker:dind
       command: ["--tls=false", "--privileged"]
   before_script:
-    - apk add --no-cache k3d
+    - apk add --no-cache helm
     - k3d cluster create test-cluster --port "8080:80@loadbalancer"
     - export KUBECONFIG=$(k3d kubeconfig write test-cluster)
     - kubectl cluster-info
