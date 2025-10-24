@@ -102,7 +102,7 @@ deploy:
     - helm package .
     - CHART_FILE=$(ls *.tgz)
     - helm push $CHART_FILE oci://$CI_REGISTRY/helm
-    - echo "Chart deployed to: oci://$CI_REGISTRY/helm/$CHART_NAME"
+    - echo "Chart deployed successfully to GitLab Container Registry"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
