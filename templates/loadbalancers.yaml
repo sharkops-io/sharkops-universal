@@ -1,0 +1,24 @@
+{{- range .Values.loadBalancers }}
+{{- if .enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common.names.fullname" $ }}-{{ .name }}-lb
+  labels:
+    {{- include "common.labels.standard" $ | nindent 4 }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .type | default "LoadBalancer" }}
+  ports:
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .targetPort }}
+      protocol: {{ .protocol | default "TCP" }}
+  selector:
+    {{- include "common.labels.selectorLabels" $ | nindent 4 }}
+{{- end }}
+{{- end }}

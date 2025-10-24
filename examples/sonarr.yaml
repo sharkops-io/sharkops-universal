@@ -1,0 +1,93 @@
+# Example values for Sonarr
+image:
+  repository: lscr.io/linuxserver/sonarr
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8989
+      targetPort: 8989
+      protocol: TCP
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: sonarr.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: sonarr-tls
+      hosts:
+        - sonarr.example.com
+
+persistence:
+  enabled: true
+  storageClass: "fast-ssd"
+  accessMode: ReadWriteOnce
+  size: 5Gi
+  mountPath: /config
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+linuxserver:
+  env:
+    PUID: 1000
+    PGID: 1000
+    TZ: America/New_York
+    UMASK_SET: 002
+
+  volumes:
+    - name: config
+      mountPath: /config
+    - name: downloads
+      mountPath: /downloads
+    - name: tv
+      mountPath: /tv
+
+  volumeClaims:
+    - name: downloads
+      size: 50Gi
+      storageClass: "fast-ssd"
+      accessMode: ReadWriteOnce
+    - name: tv
+      size: 200Gi
+      storageClass: "fast-ssd"
+      accessMode: ReadWriteOnce
+
+  livenessProbe:
+    enabled: true
+    httpGet:
+      path: /
+      port: 8989
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    httpGet:
+      path: /
+      port: 8989
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3

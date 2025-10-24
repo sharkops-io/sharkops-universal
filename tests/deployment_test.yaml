@@ -1,0 +1,141 @@
+suite: test deployment
+templates:
+  - deployment.yaml
+tests:
+  - it: should create a deployment with default values
+    set:
+      image:
+        repository: lscr.io/linuxserver/plex
+        tag: latest
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-linuxserver-universal
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: lscr.io/linuxserver/plex:latest
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: linuxserver-universal
+
+  - it: should set environment variables correctly
+    set:
+      image:
+        repository: lscr.io/linuxserver/plex
+        tag: latest
+      linuxserver:
+        env:
+          PUID: 1000
+          PGID: 1000
+          TZ: UTC
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PUID
+            value: "1000"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGID
+            value: "1000"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TZ
+            value: "UTC"
+
+  - it: should configure liveness probe when enabled
+    set:
+      image:
+        repository: lscr.io/linuxserver/plex
+        tag: latest
+      linuxserver:
+        livenessProbe:
+          enabled: true
+          httpGet:
+            path: /web
+            port: 32400
+          initialDelaySeconds: 30
+    asserts:
+      - isTrue:
+          path: spec.template.spec.containers[0].livenessProbe
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /web
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: 32400
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+          value: 30
+
+  - it: should not configure liveness probe when disabled
+    set:
+      image:
+        repository: lscr.io/linuxserver/plex
+        tag: latest
+      linuxserver:
+        livenessProbe:
+          enabled: false
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].livenessProbe
+
+  - it: should mount volumes correctly
+    set:
+      image:
+        repository: lscr.io/linuxserver/plex
+        tag: latest
+      global:
+        persistence:
+          enabled: true
+          mountPath: /config
+      linuxserver:
+        volumes:
+          - name: downloads
+            mountPath: /downloads
+          - name: media
+            mountPath: /media
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config
+            mountPath: /config
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: downloads
+            mountPath: /downloads
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: media
+            mountPath: /media
+
+  - it: should set security context correctly
+    set:
+      image:
+        repository: lscr.io/linuxserver/plex
+        tag: latest
+      global:
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          fsGroup: 1000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 1000
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 1000

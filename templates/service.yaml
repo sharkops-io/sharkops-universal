@@ -1,0 +1,35 @@
+{{- $defaultType := .Values.service.type }}
+{{- $services := dict }}
+{{- range .Values.service.ports }}
+{{- $portType := .type | default $defaultType }}
+{{- $serviceName := printf "%s-%s" (include "common.names.fullname" $) $portType | lower }}
+{{- if not (hasKey $services $serviceName) }}
+{{- $_ := set $services $serviceName (dict "type" $portType "ports" list) }}
+{{- end }}
+{{- $service := index $services $serviceName }}
+{{- $_ := set $service "ports" (append $service.ports .) }}
+{{- end }}
+{{- range $serviceName, $service := $services }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $serviceName }}
+  labels:
+    {{- include "common.labels.standard" $ | nindent 4 }}
+  {{- with $.Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $service.type }}
+  ports:
+    {{- range $service.ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .targetPort }}
+      protocol: {{ .protocol }}
+    {{- end }}
+  selector:
+    {{- include "common.labels.selectorLabels" $ | nindent 4 }}
+{{- end }}

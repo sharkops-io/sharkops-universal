@@ -1,0 +1,120 @@
+# Example values for Deluge
+image:
+  repository: lscr.io/linuxserver/deluge
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP  # Default for ports that don't specify their own type
+  ports:
+    - name: web
+      port: 8112
+      targetPort: 8112
+      protocol: TCP
+      # Uses default ClusterIP type
+    - name: daemon
+      port: 58846
+      targetPort: 58846
+      protocol: TCP
+      # Uses default ClusterIP type
+    - name: incoming
+      port: 58946
+      targetPort: 58946
+      protocol: TCP
+      type: LoadBalancer  # This port gets its own LoadBalancer service
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: deluge.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: deluge-tls
+      hosts:
+        - deluge.example.com
+
+# Additional ingress for daemon port
+additionalIngresses:
+  - name: daemon
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/backend-protocol: "TCP"
+    hosts:
+      - host: deluge-daemon.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: deluge-daemon-tls
+        hosts:
+          - deluge-daemon.example.com
+    port: daemon  # Port name from service
+
+# Note: LoadBalancer services are now configured per-port in the service.ports section above
+
+persistence:
+  enabled: true
+  storageClass: "fast-ssd"
+  accessMode: ReadWriteOnce
+  size: 5Gi
+  mountPath: /config
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+linuxserver:
+  env:
+    PUID: 1000
+    PGID: 1000
+    TZ: America/New_York
+    UMASK_SET: 002
+    DELUGE_LOGLEVEL: info
+
+  volumes:
+    - name: config
+      mountPath: /config
+    - name: downloads
+      mountPath: /downloads
+
+  volumeClaims:
+    - name: downloads
+      size: 100Gi
+      storageClass: "fast-ssd"
+      accessMode: ReadWriteOnce
+
+  livenessProbe:
+    enabled: true
+    httpGet:
+      path: /
+      port: 8112
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    httpGet:
+      path: /
+      port: 8112
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3

@@ -1,0 +1,61 @@
+# Chart Testing Configuration
+chart-dirs:
+  - .
+
+# Namespace to deploy charts
+namespace: chart-testing
+
+# Release name prefix
+release-name: ct
+
+# Test values files
+test-values:
+  - examples/plex.yaml
+  - examples/radarr.yaml
+  - examples/sonarr.yaml
+  - examples/tautulli.yaml
+  - examples/deluge.yaml
+
+# Additional test values
+additional-test-values:
+  - examples/plex.yaml
+  - examples/radarr.yaml
+  - examples/sonarr.yaml
+  - examples/tautulli.yaml
+  - examples/deluge.yaml
+
+# Lint configuration
+lint-conf: .ct/lintconf.yaml
+
+# Validate chart schema
+validate-maintainers: false
+
+# Validate chart.yaml
+validate-chart-schema: true
+
+# Validate values.yaml
+validate-values-schema: true
+
+# Check for chart version increment
+check-version-increment: true
+
+# Target branch for version checking
+target-branch: main
+
+# Build chart dependencies
+build-charts: true
+
+# Install chart dependencies
+install-charts: true
+
+# Upgrade charts
+upgrade: true
+
+# Test timeout
+timeout: 300
+
+# Parallel testing
+parallel: true
+
+# Maximum parallel tests
+max-parallel: 4

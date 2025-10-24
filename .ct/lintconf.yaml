@@ -1,0 +1,18 @@
+# Chart Testing Lint Configuration
+strict: true
+warnings:
+  - missingChartVersion
+  - missingMaintainers
+  - deprecatedApiVersions
+  - missingTestFiles
+  - missingValuesFile
+  - badChartType
+  - invalidChartName
+  - invalidMaintainerName
+  - invalidMaintainerEmail
+  - missingChartDescription
+  - invalidChartHome
+  - invalidChartSources
+  - invalidChartKeywords
+  - invalidChartAnnotations
+  - invalidChartDependencies

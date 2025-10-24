@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "common.labels.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "common.serviceAccountName" . }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- range $key, $value := .Values.linuxserver.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          ports:
+            {{- range .Values.service.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .targetPort }}
+              protocol: {{ .protocol }}
+            {{- end }}
+          {{- if .Values.linuxserver.livenessProbe.enabled }}
+          livenessProbe:
+            {{- if .Values.linuxserver.livenessProbe.httpGet }}
+            httpGet:
+              path: {{ .Values.linuxserver.livenessProbe.httpGet.path }}
+              port: {{ .Values.linuxserver.livenessProbe.httpGet.port }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.linuxserver.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.linuxserver.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.linuxserver.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.linuxserver.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.linuxserver.readinessProbe.enabled }}
+          readinessProbe:
+            {{- if .Values.linuxserver.readinessProbe.httpGet }}
+            httpGet:
+              path: {{ .Values.linuxserver.readinessProbe.httpGet.path }}
+              port: {{ .Values.linuxserver.readinessProbe.httpGet.port }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.linuxserver.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.linuxserver.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.linuxserver.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.linuxserver.readinessProbe.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.persistence.enabled }}
+            - name: config
+              mountPath: {{ .Values.persistence.mountPath }}
+            {{- end }}
+            {{- range .Values.linuxserver.volumes }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+      volumes:
+        {{- if .Values.persistence.enabled }}
+        - name: config
+          persistentVolumeClaim:
+            claimName: {{ include "common.names.fullname" . }}
+        {{- end }}
+        {{- range .Values.linuxserver.volumeClaims }}
+        - name: {{ .name }}
+          persistentVolumeClaim:
+            claimName: {{ include "common.names.fullname" $ }}-{{ .name }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

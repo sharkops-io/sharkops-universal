@@ -1,0 +1,66 @@
+suite: test ingress
+templates:
+  - ingress.yaml
+tests:
+  - it: should not create ingress when disabled
+    set:
+      global:
+        ingress:
+          enabled: false
+    asserts:
+      - isNull:
+          path: metadata
+
+  - it: should create ingress when enabled
+    set:
+      global:
+        ingress:
+          enabled: true
+          className: nginx
+          annotations:
+            cert-manager.io/cluster-issuer: letsencrypt-prod
+          hosts:
+            - host: plex.example.com
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: plex-tls
+              hosts:
+                - plex.example.com
+        service:
+          port: 32400
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-linuxserver-universal
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+      - contains:
+          path: metadata.annotations
+          content:
+            cert-manager.io/cluster-issuer: letsencrypt-prod
+      - equal:
+          path: spec.rules[0].host
+          value: plex.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: Prefix
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-linuxserver-universal
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 32400
+      - equal:
+          path: spec.tls[0].secretName
+          value: plex-tls
+      - contains:
+          path: spec.tls[0].hosts
+          content: plex.example.com
