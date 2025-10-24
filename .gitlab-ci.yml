@@ -35,6 +35,8 @@ test-with-cluster:
   before_script:
     - apk add --no-cache helm curl bash docker-cli
     - curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
     - sleep 10
     - docker info
     - k3d cluster create test-cluster --port "8080:80@loadbalancer"
@@ -60,8 +62,9 @@ unit-tests:
   stage: test
   image: alpine:latest
   before_script:
-    - apk add --no-cache helm curl
-    - curl -L https://github.com/quintush/helm-unittest/releases/download/v0.2.11/helm-unittest-linux-amd64.tar.gz | tar -xz
+    - apk add --no-cache helm curl tar
+    - curl -L https://github.com/helm-unittest/helm-unittest/releases/download/v0.2.8/helm-unittest-linux-amd64.tar.gz -o helm-unittest.tar.gz
+    - tar -xzf helm-unittest.tar.gz
     - mv helm-unittest /usr/local/bin/
     - chmod +x /usr/local/bin/helm-unittest
   script:
