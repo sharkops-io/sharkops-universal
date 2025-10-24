@@ -94,7 +94,7 @@ test-examples:
       done
     - echo "🔍 Testing new features..."
     - echo "1. Testing restructured PVC configuration..."
-    - helm template test-release . | grep -A 5 "PersistentVolumeClaim" | head -20
+    - helm template test-release . --set persistence.enabled=true | grep -A 5 "PersistentVolumeClaim" | head -20
     - echo "✅ PVC restructuring working"
     - echo "2. Testing existing PVC support..."
     - helm template test-release . -f examples/existing-pvc.yaml | grep -c "PersistentVolumeClaim" || echo "0"
