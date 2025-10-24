@@ -23,6 +23,33 @@ A universal Helm chart for deploying any Docker container on Kubernetes. This ch
 
 ### Install the Chart
 
+#### From GitLab Container Registry (OCI)
+
+The OCI registry approach is the modern, recommended way to distribute Helm charts. Our chart is publicly accessible:
+
+```bash
+# Install latest version from OCI registry (no authentication required)
+helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal
+
+# Install specific version
+helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal --version 1.0.0
+
+# Install with custom values
+helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal \
+  -f examples/plex.yaml
+
+# Install with custom values and specific version
+helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal \
+  --version 1.0.0 \
+  -f examples/plex.yaml
+
+# Pull chart for inspection
+helm pull oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal --version 1.0.0
+
+# Show chart information
+helm show chart oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal
+```
+
 #### From Local Chart
 
 ```bash
@@ -36,80 +63,6 @@ helm install my-app ./sharkops-universal -f examples/plex.yaml
 helm install my-app ./sharkops-universal \
   --set image.repository=nginxinc/nginx-unprivileged \
   --set image.tag=alpine
-```
-
-#### From GitLab Helm Repository
-
-```bash
-# Add GitLab Helm repository (public access)
-helm repo add sharkops-helm https://gitlab.com/api/v4/projects/sharkops%2Fhelm-charts%2Fsharkops-universal/packages/helm/stable
-
-# Update repository
-helm repo update
-
-# Install from GitLab Helm repository
-helm install my-app sharkops-helm/sharkops-universal
-
-# Install with custom values
-helm install my-app sharkops-helm/sharkops-universal \
-  -f examples/plex.yaml
-
-# Install with custom image
-helm install my-app sharkops-helm/sharkops-universal \
-  --set image.repository=nginxinc/nginx-unprivileged \
-  --set image.tag=alpine
-```
-
-**View Available Packages:**
-
-You can view all available chart versions in the [GitLab Package Registry](https://gitlab.com/sharkops/helm-charts/sharkops-universal/-/packages).
-
-#### From GitLab Container Registry (OCI) - Recommended
-
-The OCI registry approach is the modern, recommended way to distribute Helm charts:
-
-```bash
-# Login to GitLab Container Registry (requires authentication)
-helm registry login registry.gitlab.com
-
-# Install latest version from OCI registry
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal
-
-# Install specific version
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal --version 1.0.0
-
-# Install with custom values
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal \
-  -f examples/plex.yaml
-
-# Install with custom values and specific version
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal \
-  --version 1.0.0 \
-  -f examples/plex.yaml
-
-# Pull chart for inspection
-helm pull oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal --version 1.0.0
-
-# List available versions (requires authentication)
-helm show chart oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal
-```
-
-**Benefits of OCI Registry:**
-- ✅ Modern standard for container and Helm chart distribution
-- ✅ Better security and authentication
-- ✅ Direct chart access without repository management
-- ✅ Version-specific pulls
-- ✅ Works with any OCI-compatible registry
-
-**Authentication:** OCI registry requires authentication. You'll need to provide credentials when prompted by `helm registry login`.
-
-**Pro Tip:** You can create an alias for easier usage:
-```bash
-# Add to your shell profile (.bashrc, .zshrc, etc.)
-alias sharkops-chart='oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal'
-
-# Then use it like this:
-helm install my-app sharkops-chart --version 1.0.0
 ```
 
 ## Configuration

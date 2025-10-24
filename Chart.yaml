@@ -9,7 +9,7 @@ sources:
   - https://gitlab.com/sharkops/helm-charts/sharkops-universal
 maintainers:
   - name: Andrew Landsverk
-    email: andrew@example.com
+    email: noreply@example.com
 keywords:
   - docker
   - container
