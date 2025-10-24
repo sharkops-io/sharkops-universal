@@ -6,5 +6,5 @@ tests:
     set:
       additionalIngresses: []
     asserts:
-      - isEmpty:
+      - notExists:
           path: .
