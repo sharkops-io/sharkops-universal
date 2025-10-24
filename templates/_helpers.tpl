@@ -64,3 +64,37 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create a short app name based on the image repository
+*/}}
+{{- define "common.names.appName" -}}
+{{- if .Values.image.repository }}
+{{- $repo := .Values.image.repository }}
+{{- $repo = $repo | replace "nginxinc/" "" }}
+{{- $repo = $repo | replace "linuxserver/" "" }}
+{{- $repo = $repo | replace "plexinc/" "" }}
+{{- $repo = $repo | replace "ghcr.io/" "" }}
+{{- $repo = $repo | replace "docker.io/" "" }}
+{{- $repo = $repo | replace "quay.io/" "" }}
+{{- $repo = $repo | replace "registry.gitlab.com/" "" }}
+{{- $repo = $repo | replace ":latest" "" }}
+{{- $repo = $repo | replace ":alpine" "" }}
+{{- $repo = $repo | replace ":stable" "" }}
+{{- $repo | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- "app" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create a short deployment name based on the image repository
+*/}}
+{{- define "common.names.deploymentName" -}}
+{{- if .Values.image.repository }}
+{{- $appName := include "common.names.appName" . }}
+{{- printf "%s-%s" .Release.Name $appName | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- include "common.names.fullname" . }}
+{{- end }}
+{{- end }}

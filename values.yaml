@@ -142,8 +142,8 @@ linuxserver:
     enabled: true
     httpGet:
       path: /
-      port: 80
-    initialDelaySeconds: 30
+      port: http
+    initialDelaySeconds: 10
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
@@ -152,8 +152,8 @@ linuxserver:
     enabled: true
     httpGet:
       path: /
-      port: 80
-    initialDelaySeconds: 5
+      port: http
+    initialDelaySeconds: 2
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3

@@ -47,8 +47,8 @@ test-with-cluster:
     - export PATH=$PATH:/usr/local/bin
     - helm lint .
     - helm template test-release . --debug
-    - helm install --dry-run --debug test-release . --set image.repository=nginx --set image.tag=alpine
-    - helm install test-release . --wait --timeout=5m --set image.repository=nginx --set image.tag=alpine
+    - helm install --dry-run --debug test-release . --set image.repository=nginxinc/nginx-unprivileged --set image.tag=alpine --set 'service.ports[0].port=8080' --set 'service.ports[0].targetPort=8080' --set 'linuxserver.livenessProbe.httpGet.port=8080' --set 'linuxserver.readinessProbe.httpGet.port=8080'
+    - helm install test-release . --wait --timeout=5m --set image.repository=nginxinc/nginx-unprivileged --set image.tag=alpine --set 'service.ports[0].port=8080' --set 'service.ports[0].targetPort=8080' --set 'linuxserver.livenessProbe.httpGet.port=8080' --set 'linuxserver.readinessProbe.httpGet.port=8080'
     - kubectl get all
     - helm uninstall test-release
   after_script:

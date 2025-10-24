@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "common.names.fullname" . }}
+  name: {{ include "common.names.deploymentName" . }}
   labels:
     {{- include "common.labels.standard" . | nindent 4 }}
 spec:
@@ -22,7 +22,7 @@ spec:
       securityContext:
         {{- toYaml .Values.securityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: {{ include "common.names.appName" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
