@@ -75,17 +75,19 @@ Create a short app name based on the image repository
 {{- define "common.names.appName" -}}
 {{- if .Values.image.repository }}
 {{- $repo := .Values.image.repository }}
-{{- $repo = $repo | replace "nginxinc/" "" }}
-{{- $repo = $repo | replace "linuxserver/" "" }}
-{{- $repo = $repo | replace "plexinc/" "" }}
-{{- $repo = $repo | replace "ghcr.io/" "" }}
-{{- $repo = $repo | replace "docker.io/" "" }}
-{{- $repo = $repo | replace "quay.io/" "" }}
-{{- $repo = $repo | replace "registry.gitlab.com/" "" }}
-{{- $repo = $repo | replace ":latest" "" }}
-{{- $repo = $repo | replace ":alpine" "" }}
-{{- $repo = $repo | replace ":stable" "" }}
-{{- $repo | trunc 63 | trimSuffix "-" }}
+{{- $tagParts := split ":" $repo }}
+{{- $repo = "" }}
+{{- range $tagParts }}
+{{- if not $repo }}
+{{- $repo = . }}
+{{- end }}
+{{- end }}
+{{- $parts := split "/" $repo }}
+{{- $lastPart := "" }}
+{{- range $parts }}
+{{- $lastPart = . }}
+{{- end }}
+{{- $lastPart | trunc 63 | trimSuffix "-" }}
 {{- else }}
 {{- "app" }}
 {{- end }}
