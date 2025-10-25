@@ -2,7 +2,11 @@
 Expand the name of the chart.
 */}}
 {{- define "common.names.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- if .Values.nameOverride }}
+{{- .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- "app" }}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -11,18 +15,18 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 If release name contains chart name it will be used as a full name.
 */}}
 {{- define "common.names.fullname" -}}
-{{- $fullnameOverride := "" -}}
-{{- if hasKey .Values "fullnameOverride" -}}
-{{- $fullnameOverride = .Values.fullnameOverride -}}
-{{- end -}}
-{{- if $fullnameOverride }}
-{{- $fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- $name := default .Chart.Name (default "" .Values.nameOverride) }}
+{{- $name := default "" .Values.nameOverride }}
+{{- if $name }}
 {{- if contains $name .Release.Name }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
 {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- else }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end }}
 {{- end }}
