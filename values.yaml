@@ -57,14 +57,37 @@ additionalIngresses: []
 
 # LoadBalancer services for additional ports
 loadBalancers: []
-  # Example:
+  # Example (single port):
   # - name: daemon
   #   enabled: true
-  #   type: LoadBalancer
   #   port: 58846
   #   targetPort: 58846
+  #   protocol: TCP
   #   annotations:
   #     service.beta.kubernetes.io/aws-load-balancer-type: nlb
+  #
+  # Example (with specific IP for MetalLB):
+  # - name: external
+  #   enabled: true
+  #   port: 8080
+  #   targetPort: 8080
+  #   protocol: TCP
+  #   loadBalancerIP: 192.168.1.100
+  #   annotations:
+  #     metallb.universe.tf/address-pool: production
+  #
+  # Example (multiple protocols on same port):
+  # - name: multi-protocol
+  #   enabled: true
+  #   ports:
+  #     - name: tcp-8080
+  #       port: 8080
+  #       targetPort: 8080
+  #       protocol: TCP
+  #     - name: udp-8080
+  #       port: 8080
+  #       targetPort: 8080
+  #       protocol: UDP
 
 # Persistence settings
 persistence:

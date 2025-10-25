@@ -121,10 +121,50 @@ When ports have different service types, separate Kubernetes services are create
 | `loadBalancers` | LoadBalancer services for additional ports | `[]` |
 | `loadBalancers[].name` | LoadBalancer service name | Required |
 | `loadBalancers[].enabled` | Enable this LoadBalancer | `true` |
-| `loadBalancers[].type` | LoadBalancer type | `LoadBalancer` |
-| `loadBalancers[].port` | External port | Required |
-| `loadBalancers[].targetPort` | Target port | Required |
+| `loadBalancers[].port` | External port (single port mode) | Optional |
+| `loadBalancers[].targetPort` | Target port (single port mode) | Optional |
+| `loadBalancers[].protocol` | Protocol (single port mode) | `TCP` |
+| `loadBalancers[].ports` | Multiple ports array | `[]` |
+| `loadBalancers[].ports[].name` | Port name | Required |
+| `loadBalancers[].ports[].port` | External port | Required |
+| `loadBalancers[].ports[].targetPort` | Target port | Required |
+| `loadBalancers[].ports[].protocol` | Protocol | `TCP` |
+| `loadBalancers[].loadBalancerIP` | Specific IP for LoadBalancer (MetalLB, etc.) | Optional |
 | `loadBalancers[].annotations` | LoadBalancer annotations | `{}` |
+
+**LoadBalancer IP (MetalLB, etc.):**
+
+You can specify a specific IP for the LoadBalancer service:
+
+```yaml
+loadBalancers:
+  - name: external
+    enabled: true
+    port: 8080
+    targetPort: 8080
+    loadBalancerIP: 192.168.1.100
+    annotations:
+      metallb.universe.tf/address-pool: production
+```
+
+**Multiple Protocols on Same Port:**
+
+You can expose the same internal port with different protocols using the `ports` array:
+
+```yaml
+loadBalancers:
+  - name: multi-protocol
+    enabled: true
+    ports:
+      - name: tcp-8080
+        port: 8080
+        targetPort: 8080
+        protocol: TCP
+      - name: udp-8080
+        port: 8080
+        targetPort: 8080
+        protocol: UDP
+```
 
 ### Persistence Configuration
 
