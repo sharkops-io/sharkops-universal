@@ -67,6 +67,13 @@ helm install my-app ./sharkops-universal \
 
 ## Configuration
 
+### Chart Metadata
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `nameOverride` | Override the chart name | `""` |
+| `fullnameOverride` | Override the full name | `""` |
+
 ### Image Configuration
 
 | Parameter | Description | Default |
@@ -74,6 +81,7 @@ helm install my-app ./sharkops-universal \
 | `image.repository` | Docker image repository | `""` |
 | `image.tag` | Image tag | `""` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| `image.pullSecrets` | Image pull secrets | `[]` |
 
 ### Service Configuration
 
@@ -82,6 +90,7 @@ helm install my-app ./sharkops-universal \
 | `service.type` | Service type | `ClusterIP` |
 | `service.ports` | Service ports array | `[{name: http, port: 80, targetPort: 80, protocol: TCP, type: ClusterIP}]` |
 | `service.ports[].type` | Service type for this specific port (optional) | Uses `service.type` |
+| `service.annotations` | Service annotations | `{}` |
 
 ### Per-Port Service Types
 
@@ -105,11 +114,23 @@ When ports have different service types, separate Kubernetes services are create
 | `ingress.tls` | Ingress TLS configuration | `[]` |
 | `additionalIngresses` | Additional ingress resources for other ports | `[]` |
 
+### LoadBalancer Services
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `loadBalancers` | LoadBalancer services for additional ports | `[]` |
+| `loadBalancers[].name` | LoadBalancer service name | Required |
+| `loadBalancers[].enabled` | Enable this LoadBalancer | `true` |
+| `loadBalancers[].type` | LoadBalancer type | `LoadBalancer` |
+| `loadBalancers[].port` | External port | Required |
+| `loadBalancers[].targetPort` | Target port | Required |
+| `loadBalancers[].annotations` | LoadBalancer annotations | `{}` |
+
 ### Persistence Configuration
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `persistence.enabled` | Enable persistence | `true` |
+| `persistence.enabled` | Enable persistence | `false` |
 | `persistence.size` | Storage size | `1Gi` |
 | `persistence.mountPath` | Mount path | `/config` |
 | `persistence.storageClass` | Storage class | `""` (uses default) |
@@ -221,6 +242,13 @@ secretMounts:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
+| `healthCheck.enabled` | Enable generic health check | `true` |
+| `healthCheck.path` | Health check path | `/` |
+| `healthCheck.port` | Health check port | `80` |
+| `healthCheck.initialDelaySeconds` | Initial delay | `30` |
+| `healthCheck.periodSeconds` | Check interval | `10` |
+| `healthCheck.timeoutSeconds` | Check timeout | `5` |
+| `healthCheck.failureThreshold` | Failure threshold | `3` |
 | `livenessProbe.enabled` | Enable liveness probe | `true` |
 | `livenessProbe.httpGet.path` | HTTP path for liveness check | `/` |
 | `livenessProbe.httpGet.port` | HTTP port for liveness check | `http` |
@@ -236,6 +264,8 @@ secretMounts:
 | `readinessProbe.timeoutSeconds` | Check timeout | `3` |
 | `readinessProbe.failureThreshold` | Failure threshold | `3` |
 
+**Note**: Probes are optional. When not configured, Kubernetes will use default behavior. See examples for probe configuration patterns.
+
 ### Security Context
 
 | Parameter | Description | Default |
@@ -248,10 +278,45 @@ secretMounts:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `resources.limits.cpu` | CPU limit | `500m` |
-| `resources.limits.memory` | Memory limit | `512Mi` |
-| `resources.requests.cpu` | CPU request | `100m` |
-| `resources.requests.memory` | Memory request | `128Mi` |
+| `resources` | Resource requests and limits | `null` (optional) |
+| `resources.limits.cpu` | CPU limit | Optional |
+| `resources.limits.memory` | Memory limit | Optional |
+| `resources.requests.cpu` | CPU request | Optional |
+| `resources.requests.memory` | Memory request | Optional |
+
+### Node Selector
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `nodeSelector` | Node selector labels | `{}` |
+
+### Tolerations
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `tolerations` | Pod tolerations | `[]` |
+| `tolerations[].key` | Taint key | Required |
+| `tolerations[].operator` | Taint operator | `Equal` |
+| `tolerations[].value` | Taint value | Optional |
+| `tolerations[].effect` | Taint effect | Required |
+| `tolerations[].tolerationSeconds` | Toleration duration | Optional |
+
+### Affinity
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `affinity` | Pod affinity rules | `{}` |
+| `affinity.podAffinity` | Pod affinity rules | Optional |
+| `affinity.podAntiAffinity` | Pod anti-affinity rules | Optional |
+| `affinity.nodeAffinity` | Node affinity rules | Optional |
+
+### Service Account
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `serviceAccount.create` | Create service account | `true` |
+| `serviceAccount.annotations` | Service account annotations | `{}` |
+| `serviceAccount.name` | Service account name | `""` (auto-generated) |
 
 ## Using Existing PVCs
 
@@ -322,18 +387,6 @@ service:
 env:
   values:
     NGINX_ENTRYPOINT_QUIET_LOGS: "1"
-
-livenessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8080
-
-readinessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8080
 ```
 
 ### Plex Media Server (LinuxServer.io)
@@ -439,18 +492,6 @@ env:
     PGID: 1000
     TZ: America/New_York
     UMASK_SET: 002
-
-livenessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 7878
-
-readinessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 7878
 ```
 
 ### Tautulli (LinuxServer.io)
@@ -479,7 +520,6 @@ persistence:
   enabled: true
   size: 5Gi
   mountPath: /config
-  volumes: []
 
 env:
   values:
@@ -487,93 +527,6 @@ env:
     PGID: 1000
     TZ: America/New_York
     UMASK_SET: 002
-
-livenessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8181
-
-readinessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8181
-```
-
-### Deluge (LinuxServer.io)
-
-```yaml
-image:
-  repository: lscr.io/linuxserver/deluge
-  tag: latest
-
-service:
-  ports:
-    - name: web
-      port: 8112
-      targetPort: 8112
-      protocol: TCP
-    - name: daemon
-      port: 58846
-      targetPort: 58846
-      protocol: TCP
-    - name: incoming
-      port: 58946
-      targetPort: 58946
-      protocol: TCP
-      type: LoadBalancer  # This port gets its own LoadBalancer service
-
-ingress:
-  enabled: true
-  hosts:
-    - host: deluge.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-
-# Additional ingress for daemon port
-additionalIngresses:
-  - name: daemon
-    enabled: true
-    className: "nginx"
-    hosts:
-      - host: deluge-daemon.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    port: daemon  # Port name from service
-
-persistence:
-  enabled: true
-  size: 5Gi
-  mountPath: /config
-  volumes:
-    - name: downloads
-      mountPath: /downloads
-      persistence:
-        enabled: true
-        size: 100Gi
-
-env:
-  values:
-    PUID: 1000
-    PGID: 1000
-    TZ: America/New_York
-    UMASK_SET: 002
-    DELUGE_LOGLEVEL: info
-
-livenessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8112
-
-readinessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8112
 ```
 
 ## Testing
@@ -683,8 +636,3 @@ This chart includes GitLab CI configuration for:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- The Kubernetes and Helm communities
-- All the container image maintainers who make this possible

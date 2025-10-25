@@ -5,7 +5,6 @@
 image:
   repository: lscr.io/linuxserver/tautulli
   tag: latest
-  pullPolicy: IfNotPresent
 
 # Service configuration
 service:
@@ -40,28 +39,3 @@ env:
     TZ: America/New_York
     # App specific environment variables
     UMASK_SET: 002
-
-livenessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8181
-  initialDelaySeconds: 30
-  periodSeconds: 10
-
-readinessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8181
-  initialDelaySeconds: 5
-  periodSeconds: 5
-
-# Resources
-resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
-    cpu: 100m
-    memory: 256Mi

@@ -4,7 +4,6 @@
 image:
   repository: lscr.io/linuxserver/tautulli
   tag: latest
-  pullPolicy: IfNotPresent
 
 service:
   type: ClusterIP
@@ -81,19 +80,6 @@ persistence:
 #         storageClass: "standard"
 #         accessMode: ReadWriteOnce
 
-securityContext:
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
-
-resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
-    cpu: 100m
-    memory: 256Mi
-
 # Environment variables
 env:
   values:
@@ -103,23 +89,3 @@ env:
     TZ: America/New_York
     # Tautulli specific environment variables
     UMASK_SET: 002
-
-livenessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8181
-  initialDelaySeconds: 30
-  periodSeconds: 30
-  timeoutSeconds: 10
-  failureThreshold: 3
-
-readinessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8181
-  initialDelaySeconds: 10
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 3

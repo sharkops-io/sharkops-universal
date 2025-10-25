@@ -4,10 +4,8 @@
 image:
   repository: lscr.io/linuxserver/tautulli
   tag: latest
-  pullPolicy: IfNotPresent
 
 service:
-  type: ClusterIP
   ports:
     - name: http
       port: 8181
@@ -39,18 +37,6 @@ persistence:
   mountPath: /config
   # No additional volumes needed for basic Tautulli setup
 
-securityContext:
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
-
-resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
-    cpu: 100m
-    memory: 256Mi
 
 # Environment variables
 env:
@@ -62,22 +48,3 @@ env:
     # Tautulli specific environment variables
     UMASK_SET: 002
 
-livenessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8181
-  initialDelaySeconds: 30
-  periodSeconds: 30
-  timeoutSeconds: 10
-  failureThreshold: 3
-
-readinessProbe:
-  enabled: true
-  httpGet:
-    path: /
-    port: 8181
-  initialDelaySeconds: 10
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 3

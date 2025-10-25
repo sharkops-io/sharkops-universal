@@ -5,7 +5,6 @@
 image:
   repository: lscr.io/linuxserver/plex
   tag: latest
-  pullPolicy: IfNotPresent
 
 # Service configuration
 service:

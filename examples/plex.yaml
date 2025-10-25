@@ -2,10 +2,8 @@
 image:
   repository: lscr.io/linuxserver/plex
   tag: latest
-  pullPolicy: IfNotPresent
 
 service:
-  type: ClusterIP
   ports:
     - name: http
       port: 32400
@@ -54,19 +52,6 @@ persistence:
         storageClass: "fast-ssd"
         accessMode: ReadWriteOnce
 
-securityContext:
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
-
-resources:
-  limits:
-    cpu: 2000m
-    memory: 4Gi
-  requests:
-    cpu: 500m
-    memory: 1Gi
-
 # Environment variables
 env:
   values:
@@ -77,23 +62,3 @@ env:
     # Plex specific environment variables
     VERSION: docker
     PLEX_CLAIM: "claim-xxxxxxxxxxxxxxxxxxxx"
-
-livenessProbe:
-  enabled: true
-  httpGet:
-    path: /web
-    port: 32400
-  initialDelaySeconds: 60
-  periodSeconds: 30
-  timeoutSeconds: 10
-  failureThreshold: 3
-
-readinessProbe:
-  enabled: true
-  httpGet:
-    path: /web
-    port: 32400
-  initialDelaySeconds: 30
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 3
