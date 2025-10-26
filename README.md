@@ -102,6 +102,7 @@ helm install my-app ./sharkops-universal \
 | `service.type` | Service type | `ClusterIP` |
 | `service.ports` | Service ports array | `[{name: http, port: 80, targetPort: 80, protocol: TCP, type: ClusterIP}]` |
 | `service.ports[].type` | Service type for this specific port (optional) | Uses `service.type` |
+| `service.ports[].serviceName` | Service name for this specific port (optional) | Uses `common.names.fullname` |
 | `service.annotations` | Service annotations | `{}` |
 
 ### Per-Port Service Types
@@ -114,6 +115,25 @@ Each port can specify its own service type, allowing for flexible networking con
 - **ExternalName**: Map to external service
 
 When ports have different service types, separate Kubernetes services are created for each type.
+
+### Per-Service Naming
+
+Each port can specify its own service name, allowing for multiple services with custom names:
+
+```yaml
+service:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      serviceName: "web-service"  # Custom service name
+    - name: api
+      port: 8080
+      targetPort: 8080
+      serviceName: "api-service"   # Another custom service name
+```
+
+**Note**: If no `serviceName` is specified, the service will use `common.names.fullname` as the default name.
 
 ### Ingress Configuration
 

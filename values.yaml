@@ -31,6 +31,7 @@ service:
       targetPort: 80
       protocol: TCP
       # type: ClusterIP  # Optional: override default service type for this port
+      # serviceName: "custom-service-name"  # Optional: override service name for this port
   annotations: {}
 
 # Ingress settings

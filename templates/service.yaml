@@ -2,7 +2,7 @@
 {{- $services := dict }}
 {{- range .Values.service.ports }}
 {{- $portType := .type | default $defaultType }}
-{{- $serviceName := printf "%s-%s" (include "common.names.fullname" $) $portType | lower }}
+{{- $serviceName := .serviceName | default (include "common.names.fullname" $) }}
 {{- if not (hasKey $services $serviceName) }}
 {{- $_ := set $services $serviceName (dict "type" $portType "ports" list) }}
 {{- end }}
