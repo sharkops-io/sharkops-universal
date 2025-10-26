@@ -33,9 +33,9 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "common.names.fullname" $ }}-{{ (index $.Values.service.ports 0).type | default $.Values.service.type | lower }}
+                name: {{ .serviceName | default (include "common.names.fullname" $) }}
                 port:
-                  number: {{ (index $.Values.service.ports 0).port }}
+                  number: {{ .servicePort | default (index $.Values.service.ports 0).port }}
           {{- end }}
     {{- end }}
 {{- end }}

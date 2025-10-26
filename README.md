@@ -143,8 +143,41 @@ service:
 | `ingress.className` | Ingress class name | `""` |
 | `ingress.annotations` | Ingress annotations | `{}` |
 | `ingress.hosts` | Ingress hosts | `[]` |
+| `ingress.hosts[].paths[].serviceName` | Service name to route to (optional) | Uses `common.names.fullname` |
+| `ingress.hosts[].paths[].servicePort` | Service port to route to (optional) | Uses first service port |
 | `ingress.tls` | Ingress TLS configuration | `[]` |
 | `additionalIngresses` | Additional ingress resources for other ports | `[]` |
+
+### Custom Service Routing
+
+You can route ingress traffic to different services by specifying `serviceName` and `servicePort`:
+
+```yaml
+service:
+  ports:
+    - name: web
+      port: 80
+      targetPort: 80
+      serviceName: web-service
+    - name: api
+      port: 8080
+      targetPort: 8080
+      serviceName: api-service
+
+ingress:
+  enabled: true
+  hosts:
+    - host: example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: web-service  # Route to web service
+          servicePort: 80
+        - path: /api
+          pathType: Prefix
+          serviceName: api-service  # Route to API service
+          servicePort: 8080
+```
 
 ### LoadBalancer Services
 

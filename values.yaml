@@ -44,6 +44,8 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+          # serviceName: "custom-service"  # Optional: use different service
+          # servicePort: 8080               # Optional: use different port
   tls: []
 
 # Additional ingress resources for other ports
