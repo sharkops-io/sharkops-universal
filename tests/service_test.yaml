@@ -8,7 +8,7 @@ tests:
           of: Service
       - equal:
           path: metadata.name
-          value: release-name-clusterip
+          value: RELEASE-NAME
       - equal:
           path: spec.type
           value: ClusterIP
