@@ -17,6 +17,9 @@ spec:
   {{- if .loadBalancerIP }}
   loadBalancerIP: {{ .loadBalancerIP }}
   {{- end }}
+  {{- if .externalTrafficPolicy }}
+  externalTrafficPolicy: {{ .externalTrafficPolicy }}
+  {{- end }}
   ports:
     {{- if .ports }}
     {{- range .ports }}

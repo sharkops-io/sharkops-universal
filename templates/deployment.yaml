@@ -5,7 +5,13 @@ metadata:
   labels:
     {{- include "common.labels.standard" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  strategy:
+    type: {{ .Values.strategy.type }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge }}
   selector:
     matchLabels:
       {{- include "common.labels.selectorLabels" . | nindent 6 }}

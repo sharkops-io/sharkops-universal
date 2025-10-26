@@ -13,6 +13,15 @@ image:
   pullPolicy: IfNotPresent
   pullSecrets: []
 
+# Deployment settings
+replicas: 1
+revisionHistoryLimit: 1  # Number of old ReplicaSets to keep for rollbacks
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1  # Maximum number of pods that can be unavailable during update
+    maxSurge: 1        # Maximum number of pods that can be created above desired count
+
 # Service settings
 service:
   type: ClusterIP  # Default type for ports that don't specify their own
@@ -73,8 +82,17 @@ loadBalancers: []
   #   targetPort: 8080
   #   protocol: TCP
   #   loadBalancerIP: 192.168.1.100
+  #   externalTrafficPolicy: Local
   #   annotations:
   #     metallb.universe.tf/address-pool: production
+  #
+  # Example (with Cluster traffic policy):
+  # - name: cluster-wide
+  #   enabled: true
+  #   port: 9090
+  #   targetPort: 9090
+  #   protocol: TCP
+  #   externalTrafficPolicy: Cluster
   #
   # Example (multiple protocols on same port):
   # - name: multi-protocol

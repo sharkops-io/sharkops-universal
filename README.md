@@ -83,6 +83,18 @@ helm install my-app ./sharkops-universal \
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `image.pullSecrets` | Image pull secrets | `[]` |
 
+### Deployment Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `replicas` | Number of pod replicas | `1` |
+| `revisionHistoryLimit` | Number of old ReplicaSets to keep for rollbacks | `3` |
+| `strategy.type` | Deployment strategy type | `RollingUpdate` |
+| `strategy.rollingUpdate.maxUnavailable` | Maximum unavailable pods during update | `1` |
+| `strategy.rollingUpdate.maxSurge` | Maximum pods that can be created above desired count | `1` |
+
+**Note**: The `revisionHistoryLimit` controls how many old ReplicaSets are kept after upgrades. This helps with rollback capabilities but also prevents old ReplicaSets from accumulating indefinitely. The default of `3` keeps the current ReplicaSet plus 2 previous versions.
+
 ### Service Configuration
 
 | Parameter | Description | Default |
@@ -130,6 +142,7 @@ When ports have different service types, separate Kubernetes services are create
 | `loadBalancers[].ports[].targetPort` | Target port | Required |
 | `loadBalancers[].ports[].protocol` | Protocol | `TCP` |
 | `loadBalancers[].loadBalancerIP` | Specific IP for LoadBalancer (MetalLB, etc.) | Optional |
+| `loadBalancers[].externalTrafficPolicy` | External traffic policy (Local/Cluster) | Optional |
 | `loadBalancers[].annotations` | LoadBalancer annotations | `{}` |
 
 **LoadBalancer IP (MetalLB, etc.):**
@@ -146,6 +159,31 @@ loadBalancers:
     annotations:
       metallb.universe.tf/address-pool: production
 ```
+
+**External Traffic Policy:**
+
+Control how external traffic is routed to your pods:
+
+```yaml
+loadBalancers:
+  # Local: Preserves source IP, routes to pods on same node
+  - name: local-traffic
+    enabled: true
+    port: 8080
+    targetPort: 8080
+    externalTrafficPolicy: Local
+  
+  # Cluster: Routes to any pod, may lose source IP
+  - name: cluster-traffic
+    enabled: true
+    port: 9090
+    targetPort: 9090
+    externalTrafficPolicy: Cluster
+```
+
+**Traffic Policy Options:**
+- **`Local`**: Preserves source IP, routes to pods on the same node as the LoadBalancer
+- **`Cluster`**: Routes to any pod in the cluster, may lose source IP but better load distribution
 
 **Multiple Protocols on Same Port:**
 
