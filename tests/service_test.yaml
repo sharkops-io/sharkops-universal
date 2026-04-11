@@ -30,8 +30,10 @@ tests:
 
   - it: should set ipFamilies when specified
     set:
-      service.ipFamilies[0]: IPv4
-      service.ipFamilies[1]: IPv6
+      service:
+        ipFamilies:
+          - IPv4
+          - IPv6
     asserts:
       - equal:
           path: spec.ipFamilies[0]
@@ -42,9 +44,11 @@ tests:
 
   - it: should set both ipFamilyPolicy and ipFamilies for dual-stack
     set:
-      service.ipFamilyPolicy: RequireDualStack
-      service.ipFamilies[0]: IPv4
-      service.ipFamilies[1]: IPv6
+      service:
+        ipFamilyPolicy: RequireDualStack
+        ipFamilies:
+          - IPv4
+          - IPv6
     asserts:
       - equal:
           path: spec.ipFamilyPolicy
