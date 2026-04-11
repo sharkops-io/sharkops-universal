@@ -23,6 +23,13 @@ metadata:
   {{- end }}
 spec:
   type: {{ $service.type }}
+  {{- if $.Values.service.ipFamilyPolicy }}
+  ipFamilyPolicy: {{ $.Values.service.ipFamilyPolicy }}
+  {{- end }}
+  {{- with $.Values.service.ipFamilies }}
+  ipFamilies:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   ports:
     {{- range $service.ports }}
     - name: {{ .name }}

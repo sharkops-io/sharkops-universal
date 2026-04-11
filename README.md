@@ -104,6 +104,8 @@ helm install my-app ./sharkops-universal \
 | `service.ports[].type` | Service type for this specific port (optional) | Uses `service.type` |
 | `service.ports[].serviceName` | Service name for this specific port (optional) | Uses `common.names.fullname` |
 | `service.annotations` | Service annotations | `{}` |
+| `service.ipFamilyPolicy` | IP family policy for dual-stack (`SingleStack`, `PreferDualStack`, `RequireDualStack`) | `""` (omitted) |
+| `service.ipFamilies` | Ordered list of IP families (`IPv4`, `IPv6`) | `[]` (omitted) |
 
 ### Per-Port Service Types
 
@@ -196,6 +198,8 @@ ingress:
 | `loadBalancers[].ports[].protocol` | Protocol | `TCP` |
 | `loadBalancers[].loadBalancerIP` | Specific IP for LoadBalancer (MetalLB, etc.) | Optional |
 | `loadBalancers[].externalTrafficPolicy` | External traffic policy (Local/Cluster) | Optional |
+| `loadBalancers[].ipFamilyPolicy` | IP family policy for dual-stack (`SingleStack`, `PreferDualStack`, `RequireDualStack`) | Optional |
+| `loadBalancers[].ipFamilies` | Ordered list of IP families (`IPv4`, `IPv6`) | Optional |
 | `loadBalancers[].annotations` | LoadBalancer annotations | `{}` |
 
 **LoadBalancer IP (MetalLB, etc.):**
@@ -256,6 +260,42 @@ loadBalancers:
         targetPort: 8080
         protocol: UDP
 ```
+
+### Dual-Stack (IPv4 + IPv6)
+
+Kubernetes dual-stack support lets services receive both IPv4 and IPv6 addresses. This requires a dual-stack cluster. Use `ipFamilyPolicy` and `ipFamilies` on either the main service or individual LoadBalancer entries.
+
+**`ipFamilyPolicy` options:**
+- **`SingleStack`**: Single IP family only (default Kubernetes behaviour when omitted)
+- **`PreferDualStack`**: Request dual-stack; falls back to single-stack if the cluster doesn't support it
+- **`RequireDualStack`**: Require dual-stack; the service will fail to create on a single-stack cluster
+
+**Main service:**
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+**LoadBalancer service:**
+
+```yaml
+loadBalancers:
+  - name: external
+    enabled: true
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+    ipFamilyPolicy: RequireDualStack
+    ipFamilies:
+      - IPv4
+      - IPv6
+```
+
+The first entry in `ipFamilies` is the primary family used for the ClusterIP. Omitting `ipFamilies` while setting `ipFamilyPolicy: PreferDualStack` lets Kubernetes pick the order based on cluster defaults.
 
 ### Persistence Configuration
 

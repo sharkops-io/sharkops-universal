@@ -33,6 +33,9 @@ service:
       # type: ClusterIP  # Optional: override default service type for this port
       # serviceName: "custom-service-name"  # Optional: override service name for this port
   annotations: {}
+  # Dual-stack settings (optional)
+  # ipFamilyPolicy: SingleStack | PreferDualStack | RequireDualStack
+  # ipFamilies: [IPv4, IPv6]
 
 # Ingress settings
 ingress:
@@ -109,6 +112,17 @@ loadBalancers: []
   #       port: 8080
   #       targetPort: 8080
   #       protocol: UDP
+  #
+  # Example (dual-stack IPv4+IPv6):
+  # - name: external
+  #   enabled: true
+  #   port: 8080
+  #   targetPort: 8080
+  #   protocol: TCP
+  #   ipFamilyPolicy: PreferDualStack
+  #   ipFamilies:
+  #     - IPv4
+  #     - IPv6
 
 # Persistence settings
 persistence:
