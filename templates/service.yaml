@@ -31,11 +31,15 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   ports:
-    {{- range $service.ports }}
-    - name: {{ .name }}
-      port: {{ .port }}
-      targetPort: {{ .targetPort }}
-      protocol: {{ .protocol }}
+    {{- range $index, $port := $service.ports }}
+    - name: {{ $port.name }}
+      port: {{ $port.port }}
+      {{- if and (eq $index 0) $.Values.oauth2proxy.enabled }}
+      targetPort: 4180
+      {{- else }}
+      targetPort: {{ $port.targetPort }}
+      {{- end }}
+      protocol: {{ $port.protocol }}
     {{- end }}
   selector:
     {{- include "common.labels.selectorLabels" $ | nindent 4 }}

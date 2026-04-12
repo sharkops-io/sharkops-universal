@@ -539,6 +539,102 @@ persistence:
         existingClaim: "my-existing-media-pvc"  # Use existing PVC for media
 ```
 
+## oauth2-proxy Sidecar (Authelia SSO)
+
+The chart can inject an [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) sidecar to protect any app with Authelia OIDC authentication. When enabled, the sidecar intercepts all traffic at the pod level before it reaches the app — no ingress annotation changes required.
+
+**How it works:**
+- The sidecar listens on port 4180 and proxies authenticated requests to `localhost:<app port>`
+- The Kubernetes Service's `targetPort` is automatically overridden to 4180
+- The ingress config stays unchanged (still points to the same service port number)
+- A shared `.example.com` cookie means login once = access to all protected services
+
+### Prerequisites
+
+1. Authelia must be running with the `oauth2-proxy` OIDC client configured (see `authelia/values.yaml`)
+2. The `oauth2-proxy-credentials` secret must exist in the **app's namespace**
+
+### Step 1 — Create the credentials secret
+
+Add to the app's manifest file (e.g. `myapp.yaml` referenced by `EXTRA_MANIFEST_FILE` in `.gitlab-ci.yml`):
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oauth2-proxy-credentials
+  namespace: <your-app-namespace>
+stringData:
+  client-secret: "<same value as authelia namespace>"
+  cookie-secret: "<same value as authelia namespace>"
+```
+
+### Step 2 — Enable in values.yaml
+
+```yaml
+oauth2proxy:
+  enabled: true
+  redirectUrl: https://yourapp.example.com/oauth2/callback
+```
+
+### Step 3 — Register the redirect URI in Authelia
+
+Add one line to `authelia/values.yaml` under `configMap.identity_providers.oidc.clients[0].redirect_uris`:
+
+```yaml
+- https://yourapp.example.com/oauth2/callback
+```
+
+### Configuration reference
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `oauth2proxy.enabled` | Inject the oauth2-proxy sidecar | `false` |
+| `oauth2proxy.image.repository` | oauth2-proxy image | `quay.io/oauth2-proxy/oauth2-proxy` |
+| `oauth2proxy.image.tag` | oauth2-proxy image tag | `v7.9.0` |
+| `oauth2proxy.issuerUrl` | Authelia OIDC issuer URL | `https://auth.example.com` |
+| `oauth2proxy.clientId` | OIDC client ID | `oauth2-proxy` |
+| `oauth2proxy.redirectUrl` | Callback URL for this app — **required when enabled** | `""` |
+| `oauth2proxy.cookieDomain` | Shared cookie domain | `.example.com` |
+| `oauth2proxy.existingSecret` | Secret name with `client-secret` and `cookie-secret` keys | `oauth2-proxy-credentials` |
+
+### Full example
+
+```yaml
+image:
+  repository: lscr.io/linuxserver/sonarr
+  tag: latest
+
+service:
+  ipFamilyPolicy: PreferDualStack
+  ports:
+    - name: http
+      port: 8989
+      targetPort: 8989
+      protocol: TCP
+
+ingress:
+  enabled: true
+  className: cilium
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: sonarr.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: sonarr-tls
+      hosts:
+        - sonarr.example.com
+
+oauth2proxy:
+  enabled: true
+  redirectUrl: https://sonarr.example.com/oauth2/callback
+```
+
+---
+
 ## Examples
 
 ### Nginx (Generic Container)

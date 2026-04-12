@@ -130,6 +130,50 @@ spec:
               defaultMode: {{ .defaultMode }}
               {{- end }}
             {{- end }}
+        {{- if .Values.oauth2proxy.enabled }}
+        - name: oauth2-proxy
+          image: "{{ .Values.oauth2proxy.image.repository }}:{{ .Values.oauth2proxy.image.tag }}"
+          args:
+            - --provider=oidc
+            - --oidc-issuer-url={{ .Values.oauth2proxy.issuerUrl }}
+            - --client-id={{ .Values.oauth2proxy.clientId }}
+            - --redirect-url={{ .Values.oauth2proxy.redirectUrl }}
+            - --upstream=http://localhost:{{ (index .Values.service.ports 0).targetPort }}
+            - --http-address=[::]:4180
+            - --email-domain=*
+            - --cookie-domain={{ .Values.oauth2proxy.cookieDomain }}
+            - --whitelist-domain={{ .Values.oauth2proxy.cookieDomain }}
+            - --cookie-secure=true
+            - --skip-provider-button=true
+            - --reverse-proxy=true
+            - --pass-host-header=true
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.oauth2proxy.existingSecret }}
+                  key: client-secret
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.oauth2proxy.existingSecret }}
+                  key: cookie-secret
+          ports:
+            - name: oauth2-proxy
+              containerPort: 4180
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 4180
+            initialDelaySeconds: 2
+            periodSeconds: 5
+        {{- end }}
       volumes:
         {{- if .Values.persistence.enabled }}
         - name: config

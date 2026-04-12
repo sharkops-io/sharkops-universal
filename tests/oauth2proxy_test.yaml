@@ -1,0 +1,73 @@
+suite: oauth2proxy sidecar
+templates:
+  - deployment.yaml
+  - service.yaml
+tests:
+  - it: should not inject sidecar when disabled
+    template: deployment.yaml
+    set:
+      image.repository: test/app
+      image.tag: latest
+      service.ports:
+        - name: http
+          port: 8080
+          targetPort: 8080
+          protocol: TCP
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+
+  - it: should inject sidecar when enabled
+    template: deployment.yaml
+    set:
+      image.repository: test/app
+      image.tag: latest
+      service.ports:
+        - name: http
+          port: 8080
+          targetPort: 8080
+          protocol: TCP
+      oauth2proxy.enabled: true
+      oauth2proxy.existingSecret: oauth2-proxy-credentials
+      oauth2proxy.redirectUrl: https://test.example.com/oauth2/callback
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 2
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: oauth2-proxy
+
+  - it: should reroute service targetPort to 4180 when enabled
+    template: service.yaml
+    set:
+      image.repository: test/app
+      image.tag: latest
+      service.ports:
+        - name: http
+          port: 8080
+          targetPort: 8080
+          protocol: TCP
+      oauth2proxy.enabled: true
+      oauth2proxy.existingSecret: oauth2-proxy-credentials
+      oauth2proxy.redirectUrl: https://test.example.com/oauth2/callback
+    asserts:
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 4180
+
+  - it: should keep original targetPort when oauth2proxy disabled
+    template: service.yaml
+    set:
+      image.repository: test/app
+      image.tag: latest
+      service.ports:
+        - name: http
+          port: 8080
+          targetPort: 8080
+          protocol: TCP
+    asserts:
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080

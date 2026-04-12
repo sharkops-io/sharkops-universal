@@ -273,6 +273,40 @@ envFrom: []
 # Secret mounts
 # Mount secrets as files instead of environment variables
 secretMounts: []
+
+# oauth2-proxy sidecar — adds authentication to any sharkops-universal app
+#
+# HOW TO ENABLE ON AN APP:
+#   1. Create the credentials secret in the app's namespace (add to the app's EXTRA_MANIFEST_FILE):
+#        apiVersion: v1
+#        kind: Secret
+#        metadata:
+#          name: oauth2-proxy-credentials
+#          namespace: <your-app-namespace>
+#        stringData:
+#          client-secret: "same value as authelia namespace"
+#          cookie-secret: "same value as authelia namespace"
+#   2. Add to the app's values.yaml:
+#        oauth2proxy:
+#          enabled: true
+#          redirectUrl: https://yourapp.example.com/oauth2/callback
+#   3. Add the app's callback URL to authelia/values.yaml under
+#      configMap.identity_providers.oidc.clients[0].redirect_uris:
+#        - https://yourapp.example.com/oauth2/callback
+#
+# NOTE: The ingress config does NOT change — keep pointing to the original service port.
+# The sidecar intercepts traffic at the pod level (service targetPort → 4180 → app).
+oauth2proxy:
+  enabled: false
+  image:
+    repository: quay.io/oauth2-proxy/oauth2-proxy
+    tag: v7.9.0
+  issuerUrl: https://auth.example.com
+  clientId: oauth2-proxy
+  redirectUrl: ""  # Required when enabled: https://yourapp.example.com/oauth2/callback
+  cookieDomain: .example.com
+  # Secret name in the app's namespace with keys: client-secret, cookie-secret
+  existingSecret: oauth2-proxy-credentials
   # Example:
   # - name: "ssl-certs"
   #   secretName: "ssl-secret"
