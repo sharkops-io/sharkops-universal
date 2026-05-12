@@ -274,6 +274,19 @@ envFrom: []
 # Mount secrets as files instead of environment variables
 secretMounts: []
 
+# Extra sidecar containers injected into the pod alongside the main container.
+# Use standard Kubernetes container spec. Volumes defined under persistence are
+# available to mount here via volumeMounts.
+extraContainers: []
+  # Example:
+  # - name: my-sidecar
+  #   image: my-org/my-sidecar:latest
+  #   ports:
+  #     - containerPort: 9090
+  #   env:
+  #     - name: SOME_VAR
+  #       value: "some-value"
+
 # oauth2-proxy sidecar — adds authentication to any sharkops-universal app
 #
 # HOW TO ENABLE ON AN APP:
