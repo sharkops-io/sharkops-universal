@@ -227,6 +227,18 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
+# RBAC
+rbac:
+  clusterRole:
+    # Set to true to create a ClusterRole and ClusterRoleBinding bound to the service account
+    enabled: false
+    rules: []
+    # Example:
+    # rules:
+    #   - apiGroups: [""]
+    #     resources: ["nodes", "pods"]
+    #     verbs: ["get", "list", "watch"]
+
 # Environment variables and secrets management
 # This section allows you to manage environment variables from multiple sources
 env:
@@ -327,3 +339,19 @@ oauth2proxy:
   #   subPath: ""  # Optional: mount specific key as file
   #   defaultMode: 0400  # Optional: file permissions
 
+
+# Extra arbitrary Kubernetes objects to render alongside the release.
+# Each entry is a full Kubernetes manifest; go template expressions are supported.
+# These resources are owned by the Helm release (upgraded and deleted with it).
+extraObjects: []
+# Example:
+# extraObjects:
+#   - apiVersion: v1
+#     kind: ConfigMap
+#     metadata:
+#       name: {{ include "common.names.fullname" . }}-extra
+#       namespace: {{ .Release.Namespace }}
+#       labels:
+#         {{- include "common.labels.standard" . | nindent 8 }}
+#     data:
+#       key: value

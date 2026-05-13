@@ -1,0 +1,50 @@
+suite: test extra objects
+templates:
+  - extra-objects.yaml
+tests:
+  - it: should not render when extraObjects is empty
+    set:
+      extraObjects: []
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render a single extra object
+    set:
+      extraObjects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: my-extra-config
+            namespace: default
+          data:
+            key: value
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: my-extra-config
+
+  - it: should render multiple extra objects
+    set:
+      extraObjects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: config-one
+            namespace: default
+          data:
+            key: value
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: config-two
+            namespace: default
+          data:
+            key: value
+    asserts:
+      - hasDocuments:
+          count: 2

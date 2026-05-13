@@ -1,0 +1,67 @@
+suite: test rbac
+templates:
+  - rbac.yaml
+tests:
+  - it: should not render when disabled
+    set:
+      rbac.clusterRole.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create ClusterRole and ClusterRoleBinding when enabled
+    set:
+      rbac.clusterRole.enabled: true
+      rbac.clusterRole.rules:
+        - apiGroups: [""]
+          resources: ["nodes", "pods"]
+          verbs: ["get", "list", "watch"]
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should name ClusterRole after the release
+    set:
+      rbac.clusterRole.enabled: true
+      rbac.clusterRole.rules: []
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME
+
+  - it: should bind ClusterRoleBinding to release service account and namespace
+    set:
+      rbac.clusterRole.enabled: true
+      rbac.clusterRole.rules: []
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: ClusterRoleBinding
+      - equal:
+          path: roleRef.name
+          value: RELEASE-NAME
+      - equal:
+          path: subjects[0].name
+          value: RELEASE-NAME
+      - equal:
+          path: subjects[0].namespace
+          value: NAMESPACE
+
+  - it: should render rules into the ClusterRole
+    set:
+      rbac.clusterRole.enabled: true
+      rbac.clusterRole.rules:
+        - apiGroups: [""]
+          resources: ["nodes", "pods"]
+          verbs: ["get", "list", "watch"]
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: rules[0].resources[0]
+          value: nodes
+      - equal:
+          path: rules[0].verbs[0]
+          value: get
