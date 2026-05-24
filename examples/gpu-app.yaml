@@ -1,0 +1,45 @@
+# Example values for a GPU-accelerated application using the NVIDIA device plugin.
+# Prerequisites:
+#   - NVIDIA device plugin installed (nvidia.com/gpu.present label on GPU nodes)
+#   - NVIDIA container runtime configured (runtimeClassName: nvidia available)
+image:
+  repository: my-org/my-gpu-app
+  tag: latest
+
+service:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+
+# NVIDIA container runtime — required for GPU access
+runtimeClassName: nvidia
+
+# Request one GPU from the NVIDIA device plugin
+resources:
+  limits:
+    nvidia.com/gpu: "1"
+  requests:
+    nvidia.com/gpu: "1"
+
+# Schedule only on nodes the device plugin has labeled
+nodeSelector:
+  nvidia.com/gpu.present: "true"
+
+# 1 GB shared memory — GPU rendering workloads commonly exceed the 64 MB default
+extraVolumes:
+  - name: dshm
+    emptyDir:
+      medium: Memory
+      sizeLimit: 1Gi
+
+extraVolumeMounts:
+  - name: dshm
+    mountPath: /dev/shm
+
+env:
+  values:
+    PUID: 1000
+    PGID: 1000
+    TZ: UTC

@@ -184,6 +184,15 @@ tolerations: []
 # Affinity
 affinity: {}
 
+# Runtime class — set to "nvidia" when using the NVIDIA device plugin
+runtimeClassName: ""
+
+# Extra volumes injected into the pod spec (any Kubernetes volume type)
+extraVolumes: []
+
+# Extra volume mounts injected into the main container
+extraVolumeMounts: []
+
 # Health checks and probes
 # These are generic Kubernetes health check configurations
 healthCheck:

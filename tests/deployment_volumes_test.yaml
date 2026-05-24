@@ -27,6 +27,47 @@ tests:
             persistentVolumeClaim:
               claimName: my-existing-downloads-pvc
 
+  - it: should set runtimeClassName when specified
+    set:
+      runtimeClassName: nvidia
+    asserts:
+      - equal:
+          path: spec.template.spec.runtimeClassName
+          value: nvidia
+
+  - it: should not set runtimeClassName when empty
+    asserts:
+      - notExists:
+          path: spec.template.spec.runtimeClassName
+
+  - it: should add extraVolumes to the pod spec
+    set:
+      extraVolumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: dshm
+            emptyDir:
+              medium: Memory
+              sizeLimit: 1Gi
+
+  - it: should add extraVolumeMounts to the main container
+    set:
+      extraVolumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: dshm
+            mountPath: /dev/shm
+
   - it: should create secret mounts when specified
     set:
       secretMounts:

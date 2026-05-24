@@ -12,6 +12,7 @@ A universal Helm chart for deploying any Docker container on Kubernetes. This ch
 - **Comprehensive Testing**: Unit tests and integration tests included
 - **Environment Management**: Support for ConfigMaps, Secrets, and envFrom
 - **Persistence Options**: Flexible volume management with existing PVC support
+- **GPU Support**: Runtime class and extra volume configuration for NVIDIA GPU workloads
 
 ## Prerequisites
 
@@ -481,6 +482,39 @@ secretMounts:
 | `affinity.podAntiAffinity` | Pod anti-affinity rules | Optional |
 | `affinity.nodeAffinity` | Node affinity rules | Optional |
 
+### Runtime Class
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `runtimeClassName` | Pod runtime class (e.g. `nvidia` for GPU workloads) | `""` (omitted) |
+
+Set to `nvidia` when using the [NVIDIA device plugin](https://github.com/NVIDIA/k8s-device-plugin) to ensure the container runtime can access the GPU:
+
+```yaml
+runtimeClassName: nvidia
+```
+
+### Extra Volumes and Volume Mounts
+
+These inject arbitrary Kubernetes volumes into the pod spec and the main container. Any Kubernetes volume type is supported (`emptyDir`, `hostPath`, `configMap`, `nfs`, etc.).
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `extraVolumes` | List of volumes added to `spec.volumes` | `[]` |
+| `extraVolumeMounts` | List of volume mounts added to the main container | `[]` |
+
+```yaml
+extraVolumes:
+  - name: dshm
+    emptyDir:
+      medium: Memory
+      sizeLimit: 1Gi
+
+extraVolumeMounts:
+  - name: dshm
+    mountPath: /dev/shm
+```
+
 ### Service Account
 
 | Parameter | Description | Default |
@@ -636,6 +670,35 @@ oauth2proxy:
 ---
 
 ## Examples
+
+### GPU Workload (NVIDIA)
+
+```yaml
+image:
+  repository: my-org/my-gpu-app
+  tag: latest
+
+runtimeClassName: nvidia
+
+resources:
+  limits:
+    nvidia.com/gpu: "1"
+  requests:
+    nvidia.com/gpu: "1"
+
+nodeSelector:
+  nvidia.com/gpu.present: "true"
+
+extraVolumes:
+  - name: dshm
+    emptyDir:
+      medium: Memory
+      sizeLimit: 1Gi
+
+extraVolumeMounts:
+  - name: dshm
+    mountPath: /dev/shm
+```
 
 ### Nginx (Generic Container)
 
