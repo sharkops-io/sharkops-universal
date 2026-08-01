@@ -1,0 +1,34 @@
+# Exposing an app's Prometheus metrics to kube-prometheus-stack.
+#
+# The `serviceMonitor.labels.release` value is the part people get wrong: a
+# Prometheus deployed by kube-prometheus-stack only adopts ServiceMonitors
+# whose labels match its `serviceMonitorSelector`, which by default is
+# `release: <prometheus-release-name>`. Omit it and the ServiceMonitor is
+# created successfully, shows up in `kubectl get servicemonitor`, and is then
+# silently never scraped.
+#
+# Confirm the selector your cluster actually uses before relying on this:
+#   kubectl -n monitoring get prometheus -o jsonpath='{.items[0].spec.serviceMonitorSelector}'
+
+nameOverride: unpoller
+
+image:
+  repository: ghcr.io/unpoller/unpoller
+  tag: v3.3.4
+
+service:
+  ports:
+    - name: metrics
+      port: 9130
+      targetPort: 9130
+      protocol: TCP
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: kube-prometheus-stack
+  endpoints:
+    - port: metrics          # must match a NAME in service.ports[], not a number
+      path: /metrics
+      interval: 60s
+      scrapeTimeout: 30s

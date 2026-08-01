@@ -37,6 +37,39 @@ service:
   # ipFamilyPolicy: SingleStack | PreferDualStack | RequireDualStack
   # ipFamilies: [IPv4, IPv6]
 
+# ServiceMonitor for Prometheus Operator (kube-prometheus-stack).
+# Requires the monitoring.coreos.com/v1 ServiceMonitor CRD to already exist in
+# the cluster - enabling this without the operator installed will fail to apply.
+serviceMonitor:
+  enabled: false
+  # Extra labels on the ServiceMonitor object itself. A Prometheus deployed by
+  # kube-prometheus-stack only picks up ServiceMonitors matching its
+  # serviceMonitorSelector, which defaults to `release: <prometheus-release-name>`.
+  # That label is therefore usually REQUIRED, not decorative - without it the
+  # object applies cleanly and is then silently ignored.
+  labels: {}
+  annotations: {}
+  # Namespace to create the ServiceMonitor in. Empty = the release namespace.
+  namespace: ""
+  # Label on the scraped Service to use as the Prometheus `job` label.
+  jobLabel: ""
+  # Which namespaces to search for the matching Service. Empty = the
+  # ServiceMonitor's own namespace.
+  namespaceSelector: {}
+  # Service labels to copy onto every scraped metric.
+  targetLabels: []
+  # Pod labels to copy onto every scraped metric.
+  podTargetLabels: []
+  # Scrape endpoints, passed through to the ServiceMonitor spec verbatim - so
+  # any endpoint field the CRD supports (scheme, tlsConfig, bearerTokenSecret,
+  # relabelings, metricRelabelings, ...) can be set here.
+  # `port` must match a NAME in service.ports[], not a port number.
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+
 # Ingress settings
 ingress:
   enabled: false

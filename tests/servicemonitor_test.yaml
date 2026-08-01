@@ -1,0 +1,127 @@
+suite: test servicemonitor
+templates:
+  - servicemonitor.yaml
+tests:
+  - it: should not create a ServiceMonitor by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create a ServiceMonitor when enabled
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceMonitor
+      - isAPIVersion:
+          of: monitoring.coreos.com/v1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME
+
+  - it: should select the chart's own service via selector labels
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
+
+  - it: should merge custom labels needed for Prometheus discovery
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.labels:
+        release: kube-prometheus-stack
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: kube-prometheus-stack
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
+
+  - it: should render default endpoint
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: http
+      - equal:
+          path: spec.endpoints[0].path
+          value: /metrics
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 30s
+
+  - it: should pass arbitrary endpoint fields through verbatim
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.endpoints:
+        - port: metrics
+          path: /prometheus
+          interval: 60s
+          scheme: https
+          metricRelabelings:
+            - sourceLabels: [__name__]
+              regex: go_.*
+              action: drop
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+      - equal:
+          path: spec.endpoints[0].scheme
+          value: https
+      - equal:
+          path: spec.endpoints[0].metricRelabelings[0].action
+          value: drop
+
+  - it: should not set optional fields when unset
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - notExists:
+          path: spec.jobLabel
+      - notExists:
+          path: spec.namespaceSelector
+      - notExists:
+          path: spec.targetLabels
+      - notExists:
+          path: metadata.annotations
+
+  - it: should set optional fields when provided
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.jobLabel: app.kubernetes.io/name
+      serviceMonitor.namespaceSelector:
+        matchNames:
+          - monitoring
+      serviceMonitor.targetLabels:
+        - app.kubernetes.io/name
+      serviceMonitor.annotations:
+        example.com/owner: platform
+    asserts:
+      - equal:
+          path: spec.jobLabel
+          value: app.kubernetes.io/name
+      - equal:
+          path: spec.namespaceSelector.matchNames[0]
+          value: monitoring
+      - equal:
+          path: spec.targetLabels[0]
+          value: app.kubernetes.io/name
+      - equal:
+          path: metadata.annotations["example.com/owner"]
+          value: platform
+
+  - it: should honour an explicit namespace override
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.namespace: monitoring
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: monitoring
