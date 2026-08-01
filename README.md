@@ -13,12 +13,14 @@ A universal Helm chart for deploying any Docker container on Kubernetes. This ch
 - **Environment Management**: Support for ConfigMaps, Secrets, and envFrom
 - **Persistence Options**: Flexible volume management with existing PVC support
 - **GPU Support**: Runtime class and extra volume configuration for NVIDIA GPU workloads
+- **Prometheus Metrics**: Optional ServiceMonitor for scraping by Prometheus Operator
 
 ## Prerequisites
 
 - Kubernetes 1.19+
 - Helm 3.0+
 - (optional) Persistent volume support (for data persistence)
+- (optional) Prometheus Operator CRDs, if `serviceMonitor.enabled: true`
 
 ## Installation
 
@@ -522,6 +524,71 @@ extraVolumeMounts:
 | `serviceAccount.create` | Create service account | `true` |
 | `serviceAccount.annotations` | Service account annotations | `{}` |
 | `serviceAccount.name` | Service account name | `""` (auto-generated) |
+
+### ServiceMonitor (Prometheus Operator)
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `serviceMonitor.enabled` | Create a ServiceMonitor | `false` |
+| `serviceMonitor.labels` | Extra labels on the ServiceMonitor (see warning below) | `{}` |
+| `serviceMonitor.annotations` | ServiceMonitor annotations | `{}` |
+| `serviceMonitor.namespace` | Namespace to create it in | `""` (release namespace) |
+| `serviceMonitor.jobLabel` | Service label to use as the Prometheus `job` label | `""` |
+| `serviceMonitor.namespaceSelector` | Namespaces to search for the Service | `{}` (own namespace) |
+| `serviceMonitor.targetLabels` | Service labels to copy onto metrics | `[]` |
+| `serviceMonitor.podTargetLabels` | Pod labels to copy onto metrics | `[]` |
+| `serviceMonitor.endpoints` | Scrape endpoints, passed through verbatim | `[{port: http, path: /metrics, interval: 30s, scrapeTimeout: 10s}]` |
+
+## Prometheus ServiceMonitor
+
+Set `serviceMonitor.enabled: true` to expose the app's metrics to a Prometheus
+Operator install. Requires the `monitoring.coreos.com/v1` CRDs to already exist.
+
+```yaml
+service:
+  ports:
+    - name: metrics
+      port: 9130
+      targetPort: 9130
+      protocol: TCP
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: kube-prometheus-stack
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 60s
+```
+
+**The `release` label is usually required, not decorative.** A Prometheus
+deployed by kube-prometheus-stack only adopts ServiceMonitors matching its
+`serviceMonitorSelector`, which defaults to `release: <prometheus-release-name>`.
+Leave it off and the object is created successfully, appears in
+`kubectl get servicemonitor`, and is then **silently never scraped** — no error
+anywhere. Check what your cluster actually selects on:
+
+```bash
+kubectl -n monitoring get prometheus \
+  -o jsonpath='{.items[0].spec.serviceMonitorSelector}'
+```
+
+Two other things worth knowing:
+
+- `endpoints[].port` is a port **name** from `service.ports[]`, not a number.
+  A numeric value renders fine and then matches nothing.
+- `endpoints` is passed straight through to the CRD, so any endpoint field the
+  ServiceMonitor spec supports works here — `scheme`, `tlsConfig`,
+  `bearerTokenSecret`, `basicAuth`, `relabelings`, `metricRelabelings`.
+
+To verify the target is actually being scraped once deployed, check Prometheus's
+target list rather than trusting that the object exists:
+
+```bash
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090:9090
+curl -s localhost:9090/api/v1/targets | grep <your-app>
+```
 
 ## Using Existing PVCs
 
