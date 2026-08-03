@@ -1,0 +1,115 @@
+suite: test config checksum and pod annotations
+templates:
+  - deployment.yaml
+tests:
+  # The bug this fixes: a ConfigMap shipped via extraObjects and mounted into
+  # the pod can change without the Deployment changing at all, so the rollout
+  # is a no-op and the pod keeps serving the OLD config indefinitely. Caught in
+  # the monitoring repo - a new scraparr connector was added, the ConfigMap
+  # updated, the deploy reported success, and the exporter kept scraping four
+  # connectors instead of five until the pod was restarted by hand.
+  - it: should not add a checksum when there are no extraObjects
+    asserts:
+      - isNull:
+          path: spec.template.metadata.annotations["checksum/extra-config"]
+
+  - it: should add a checksum when a ConfigMap is shipped via extraObjects
+    set:
+      extraObjects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: app-config
+          data:
+            config.yaml: "key: value"
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/extra-config"]
+          pattern: "^[a-f0-9]{64}$"
+
+  - it: should add a checksum for a Secret too
+    set:
+      extraObjects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: app-secret
+          stringData:
+            token: abc
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/extra-config"]
+          pattern: "^[a-f0-9]{64}$"
+
+  # Only mounted-config kinds should roll the pod. A NetworkPolicy or PVC in
+  # extraObjects has no bearing on what the container has loaded, and rolling
+  # on it would be noise.
+  - it: should ignore extraObjects that are not ConfigMaps or Secrets
+    set:
+      extraObjects:
+        - apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: np
+          spec:
+            podSelector: {}
+    asserts:
+      - isNull:
+          path: spec.template.metadata.annotations["checksum/extra-config"]
+
+  - it: should still checksum when config and non-config objects are mixed
+    set:
+      extraObjects:
+        - apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: np
+          spec:
+            podSelector: {}
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: app-config
+          data:
+            a: b
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/extra-config"]
+          pattern: "^[a-f0-9]{64}$"
+
+  # NOTE: no literal hash is pinned here. Content-sensitivity is inherent to
+  # sha256sum, and pinning a digest would make the suite fail on any change to
+  # Helm's YAML serialisation rather than on a real regression.
+
+  - it: should render user-supplied podAnnotations
+    set:
+      podAnnotations:
+        example.com/owner: monitoring
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["example.com/owner"]
+          value: monitoring
+
+  - it: should keep both the checksum and user annotations
+    set:
+      podAnnotations:
+        example.com/owner: monitoring
+      extraObjects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: app-config
+          data:
+            a: b
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["example.com/owner"]
+          value: monitoring
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/extra-config"]
+          pattern: "^[a-f0-9]{64}$"
+
+  - it: should not emit an annotations block at all by default
+    asserts:
+      - isNull:
+          path: spec.template.metadata.annotations

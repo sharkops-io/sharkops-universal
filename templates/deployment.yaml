@@ -17,6 +17,39 @@ spec:
       {{- include "common.labels.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- /*
+      Roll the pod when config it MOUNTS changes.
+
+      A ConfigMap or Secret shipped through extraObjects can change without the
+      Deployment changing at all - the apply succeeds, nothing restarts, and the
+      container keeps serving the old file indefinitely. Hashing those objects
+      into a pod annotation makes the pod template change with them.
+
+      Only ConfigMap and Secret are hashed: a NetworkPolicy or PVC in
+      extraObjects has no bearing on what the container has loaded, and rolling
+      the pod for it would be noise. Env vars need no checksum - they live in
+      the pod spec already.
+
+      Caveat: the hash covers the values as written, before extra-objects.yaml
+      runs `tpl` over them. A change that only materialises through templating
+      (e.g. a referenced value used inside the object) will not move the hash.
+      */}}
+      {{- $configObjects := list }}
+      {{- range .Values.extraObjects }}
+        {{- $kind := .kind | default "" }}
+        {{- if or (eq $kind "ConfigMap") (eq $kind "Secret") }}
+          {{- $configObjects = append $configObjects . }}
+        {{- end }}
+      {{- end }}
+      {{- if or $configObjects .Values.podAnnotations }}
+      annotations:
+        {{- if $configObjects }}
+        checksum/extra-config: {{ toYaml $configObjects | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
       labels:
         {{- include "common.labels.selectorLabels" . | nindent 8 }}
     spec:
