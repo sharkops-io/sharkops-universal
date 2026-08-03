@@ -1,0 +1,48 @@
+{{- /*
+Grafana dashboards, shipped as labelled ConfigMaps for the kube-prometheus-stack
+Grafana sidecar (grafana-sc-dashboard) to pick up.
+
+WHY THIS EXISTS AND extraObjects DOES NOT WORK FOR IT:
+extra-objects.yaml renders each object through `tpl`. Grafana's legendFormat
+syntax is {{label}}, which `tpl` parses as a template action - a dashboard with
+`"legendFormat": "{{decision}}"` fails to render at all:
+
+    error calling tpl: ... function "decision" not defined
+
+So dashboard JSON must be emitted verbatim, never through tpl. That is the one
+job of this template. Do not "simplify" it by folding it back into
+extraObjects.
+
+The sidecar only loads ConfigMaps carrying its watch label (LABEL /
+LABEL_VALUE, `grafana_dashboard: "1"` by default) and only in namespaces it is
+configured to watch - if yours is scoped to Grafana's own namespace rather than
+ALL, a ConfigMap created here is created and then silently ignored.
+
+One ConfigMap per dashboard, deliberately: a single object would share the
+1 MiB etcd object limit across every dashboard in the release.
+*/ -}}
+{{- if .Values.grafanaDashboards.enabled }}
+{{- range $name, $json := .Values.grafanaDashboards.dashboards }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "common.labels.standard" $ | nindent 4 }}
+    {{ $.Values.grafanaDashboards.label }}: {{ $.Values.grafanaDashboards.labelValue | quote }}
+    {{- with $.Values.grafanaDashboards.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $.Values.grafanaDashboards.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  {{- /* |- (strip), so the stored value is the JSON exactly, with no trailing
+     newline appended by the block scalar. */}}
+  {{ $name }}.json: |-
+{{ $json | trim | indent 4 }}
+{{- end }}
+{{- end }}

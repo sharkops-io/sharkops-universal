@@ -83,25 +83,29 @@ spec:
               containerPort: {{ .targetPort }}
               protocol: {{ .protocol }}
             {{- end }}
-          {{- if .Values.livenessProbe.enabled }}
+          {{- /*
+          Probe paths/ports resolve per-probe first, then fall back to the
+          shared .Values.healthCheck. `| default dict` guards against a
+          consumer setting `httpGet: null` outright, which would otherwise be
+          a nil-pointer at render time.
+          */}}
+          {{- $liveness := .Values.livenessProbe.httpGet | default dict }}
+          {{- $readiness := .Values.readinessProbe.httpGet | default dict }}
+          {{- if and .Values.healthCheck.enabled .Values.livenessProbe.enabled }}
           livenessProbe:
-            {{- if .Values.livenessProbe.httpGet }}
             httpGet:
-              path: {{ .Values.livenessProbe.httpGet.path }}
-              port: {{ .Values.livenessProbe.httpGet.port }}
-            {{- end }}
+              path: {{ $liveness.path | default .Values.healthCheck.path }}
+              port: {{ $liveness.port | default .Values.healthCheck.port }}
             initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
           {{- end }}
-          {{- if .Values.readinessProbe.enabled }}
+          {{- if and .Values.healthCheck.enabled .Values.readinessProbe.enabled }}
           readinessProbe:
-            {{- if .Values.readinessProbe.httpGet }}
             httpGet:
-              path: {{ .Values.readinessProbe.httpGet.path }}
-              port: {{ .Values.readinessProbe.httpGet.port }}
-            {{- end }}
+              path: {{ $readiness.path | default .Values.healthCheck.path }}
+              port: {{ $readiness.port | default .Values.healthCheck.port }}
             initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}

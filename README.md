@@ -416,29 +416,97 @@ secretMounts:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `healthCheck.enabled` | Enable generic health check | `true` |
-| `healthCheck.path` | Health check path | `/` |
-| `healthCheck.port` | Health check port | `80` |
-| `healthCheck.initialDelaySeconds` | Initial delay | `30` |
-| `healthCheck.periodSeconds` | Check interval | `10` |
-| `healthCheck.timeoutSeconds` | Check timeout | `5` |
-| `healthCheck.failureThreshold` | Failure threshold | `3` |
+`healthCheck` sets the HTTP endpoint **both** probes use. Set it once there
+rather than twice below; per-probe `httpGet` values override it for that probe
+only.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `healthCheck.enabled` | Master switch — `false` drops BOTH probes | `true` |
+| `healthCheck.path` | Shared probe path | `/` |
+| `healthCheck.port` | Shared probe port **name** (from `service.ports[]`) | `http` |
 | `livenessProbe.enabled` | Enable liveness probe | `true` |
-| `livenessProbe.httpGet.path` | HTTP path for liveness check | `/` |
-| `livenessProbe.httpGet.port` | HTTP port for liveness check | `http` |
+| `livenessProbe.httpGet.path` | Override the shared path, liveness only | *(inherits `healthCheck.path`)* |
+| `livenessProbe.httpGet.port` | Override the shared port, liveness only | *(inherits `healthCheck.port`)* |
 | `livenessProbe.initialDelaySeconds` | Initial delay before first check | `10` |
 | `livenessProbe.periodSeconds` | Check interval | `10` |
 | `livenessProbe.timeoutSeconds` | Check timeout | `5` |
 | `livenessProbe.failureThreshold` | Failure threshold | `3` |
 | `readinessProbe.enabled` | Enable readiness probe | `true` |
-| `readinessProbe.httpGet.path` | HTTP path for readiness check | `/` |
-| `readinessProbe.httpGet.port` | HTTP port for readiness check | `http` |
+| `readinessProbe.httpGet.path` | Override the shared path, readiness only | *(inherits `healthCheck.path`)* |
+| `readinessProbe.httpGet.port` | Override the shared port, readiness only | *(inherits `healthCheck.port`)* |
 | `readinessProbe.initialDelaySeconds` | Initial delay before first check | `2` |
 | `readinessProbe.periodSeconds` | Check interval | `5` |
 | `readinessProbe.timeoutSeconds` | Check timeout | `3` |
 | `readinessProbe.failureThreshold` | Failure threshold | `3` |
 
-**Note**: Probes are optional. When not configured, Kubernetes will use default behavior. See examples for probe configuration patterns.
+```yaml
+# One endpoint, both probes:
+healthCheck:
+  path: /healthz
+  port: http
+
+# Different endpoints per probe:
+healthCheck:
+  path: /healthz
+livenessProbe:
+  httpGet:
+    path: /alive
+```
+
+**Timing stays per-probe.** Liveness and readiness want different
+`initialDelaySeconds`, so there is deliberately no shared timing on
+`healthCheck`.
+
+> **Changed in 0.17.0** — `healthCheck` previously had **no effect at all**:
+> it was declared in `values.yaml` with path/port/timeouts and referenced
+> nowhere in the chart, so setting `healthCheck.path` rendered cleanly and
+> silently left the probes on `/`. It now drives both probes.
+> `healthCheck.initialDelaySeconds`, `periodSeconds`, `timeoutSeconds` and
+> `failureThreshold` were removed rather than wired up (see above); they did
+> nothing before and do nothing now, so they are gone rather than left looking
+> meaningful. Charts that only set `livenessProbe`/`readinessProbe`, or set
+> nothing, render byte-identical output.
+
+### Grafana Dashboards
+
+Ships dashboards as ConfigMaps labelled for the kube-prometheus-stack Grafana
+sidecar, so a dashboard lives in the same repo — and the same diff — as the
+exporter whose metrics it queries.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `grafanaDashboards.enabled` | Create dashboard ConfigMaps | `false` |
+| `grafanaDashboards.dashboards` | Map of name → dashboard JSON string | `{}` |
+| `grafanaDashboards.label` | Sidecar watch label | `grafana_dashboard` |
+| `grafanaDashboards.labelValue` | Sidecar watch label value | `"1"` |
+| `grafanaDashboards.labels` | Extra labels (e.g. `grafana_folder`) | `{}` |
+| `grafanaDashboards.annotations` | Extra annotations | `{}` |
+
+Each entry becomes its own ConfigMap named `<release>-<key>`, with the JSON
+under data key `<key>.json` — one object per dashboard so they don't share the
+1 MiB etcd object limit.
+
+In a helmfile values file, use the `.gotmpl` extension so the JSON can stay a
+real, diffable file on disk:
+
+```yaml
+grafanaDashboards:
+  enabled: true
+  dashboards:
+    my-app: |
+      {{ readFile "dashboards/my-app.json" | indent 6 | trim }}
+```
+
+**Do not use `extraObjects` for dashboards.** `extraObjects` renders each
+object through `tpl`, and Grafana's `legendFormat` syntax is `{{label}}` — a
+dashboard containing `"legendFormat": "{{decision}}"` fails outright with
+`error calling tpl: ... function "decision" not defined`. This template emits
+the JSON verbatim, which is the whole reason it exists separately.
+
+Requires the Grafana sidecar to be watching the namespace: with
+`NAMESPACE=ALL` any namespace works, otherwise only Grafana's own. Mismatch
+here means the ConfigMap is created and silently ignored.
 
 ### Security Context
 
