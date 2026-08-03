@@ -366,6 +366,13 @@ envFrom: []
 # Mount secrets as files instead of environment variables
 secretMounts: []
 
+# Extra annotations on the POD template (not the Deployment object).
+# Note the chart also adds `checksum/extra-config` automatically whenever
+# extraObjects contains a ConfigMap or Secret - see templates/deployment.yaml -
+# so that changing mounted config actually rolls the pod instead of applying
+# cleanly and leaving the old file loaded.
+podAnnotations: {}
+
 # Extra sidecar containers injected into the pod alongside the main container.
 # Use standard Kubernetes container spec. Volumes defined under persistence are
 # available to mount here via volumeMounts.
