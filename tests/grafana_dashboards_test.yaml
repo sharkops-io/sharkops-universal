@@ -1,0 +1,102 @@
+suite: test grafana dashboards
+templates:
+  - grafana-dashboards.yaml
+tests:
+  - it: should not create anything by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create anything when enabled with no dashboards
+    set:
+      grafanaDashboards.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create a labelled ConfigMap per dashboard
+    set:
+      grafanaDashboards.enabled: true
+      grafanaDashboards.dashboards:
+        my-dash: '{"uid":"x","panels":[]}'
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-my-dash
+      # This label is the entire delivery mechanism - the Grafana sidecar
+      # watches for it (LABEL=grafana_dashboard, LABEL_VALUE=1, NAMESPACE=ALL).
+      # Without it the ConfigMap applies cleanly and is silently ignored.
+      - equal:
+          path: metadata.labels["grafana_dashboard"]
+          value: "1"
+      - equal:
+          path: data["my-dash.json"]
+          value: '{"uid":"x","panels":[]}'
+
+  # THE reason this template exists rather than reusing extraObjects:
+  # extra-objects.yaml runs `tpl` over every object, and Grafana's
+  # legendFormat syntax is {{label}}. tpl parses that as a template action
+  # and fails with `function "decision" not defined`. Dashboards must be
+  # emitted verbatim, never through tpl.
+  - it: should pass Grafana legendFormat braces through untouched
+    set:
+      grafanaDashboards.enabled: true
+      grafanaDashboards.dashboards:
+        legend: '{"targets":[{"legendFormat":"{{decision}}"}]}'
+    asserts:
+      - equal:
+          path: data["legend.json"]
+          value: '{"targets":[{"legendFormat":"{{decision}}"}]}'
+
+  - it: should emit one ConfigMap per dashboard
+    set:
+      grafanaDashboards.enabled: true
+      grafanaDashboards.dashboards:
+        one: '{"uid":"a"}'
+        two: '{"uid":"b"}'
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should allow overriding the sidecar label and value
+    set:
+      grafanaDashboards.enabled: true
+      grafanaDashboards.label: custom_dashboard
+      grafanaDashboards.labelValue: "yes"
+      grafanaDashboards.dashboards:
+        d: '{}'
+    asserts:
+      - equal:
+          path: metadata.labels["custom_dashboard"]
+          value: "yes"
+
+  - it: should carry the standard chart labels too
+    set:
+      grafanaDashboards.enabled: true
+      grafanaDashboards.dashboards:
+        d: '{}'
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
+
+  - it: should support extra labels and annotations
+    set:
+      grafanaDashboards.enabled: true
+      grafanaDashboards.labels:
+        grafana_folder: Media
+      grafanaDashboards.annotations:
+        owner: monitoring
+      grafanaDashboards.dashboards:
+        d: '{}'
+    asserts:
+      - equal:
+          path: metadata.labels["grafana_folder"]
+          value: Media
+      - equal:
+          path: metadata.annotations.owner
+          value: monitoring

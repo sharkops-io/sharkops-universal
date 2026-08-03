@@ -1,0 +1,112 @@
+suite: test healthCheck drives the probes
+templates:
+  - deployment.yaml
+tests:
+  # Regression guard: before this change, `healthCheck` was declared in
+  # values.yaml with path/port/timeouts and referenced NOWHERE in the chart.
+  # Setting healthCheck.path rendered cleanly and left the probes on "/".
+  - it: should apply healthCheck.path to BOTH probes
+    set:
+      healthCheck.path: /healthz
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /healthz
+
+  - it: should apply healthCheck.port to both probes
+    set:
+      healthCheck.port: metrics
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: metrics
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: metrics
+
+  # Backward compatibility: consumers that set nothing must keep the exact
+  # probe config they had before healthCheck was wired up.
+  - it: should default to / on the http port, as before
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: http
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: http
+
+  - it: should keep the distinct per-probe initialDelaySeconds defaults
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+          value: 10
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+          value: 2
+
+  # A per-probe override must win over the shared default, and must not
+  # leak into the other probe.
+  - it: should let livenessProbe override healthCheck for liveness only
+    set:
+      healthCheck.path: /healthz
+      livenessProbe.httpGet.path: /alive
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /alive
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /healthz
+
+  - it: should let readinessProbe override healthCheck for readiness only
+    set:
+      healthCheck.path: /healthz
+      readinessProbe.httpGet.path: /ready
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /ready
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+
+  - it: should allow a per-probe port override
+    set:
+      healthCheck.port: http
+      livenessProbe.httpGet.port: metrics
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: metrics
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: http
+
+  # healthCheck.enabled is the master switch - an app with no HTTP endpoint
+  # at all needs a way to turn both probes off in one place.
+  - it: should drop both probes when healthCheck is disabled
+    set:
+      healthCheck.enabled: false
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].livenessProbe
+      - isNull:
+          path: spec.template.spec.containers[0].readinessProbe
+
+  - it: should still honour the per-probe enabled flags
+    set:
+      livenessProbe.enabled: false
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].livenessProbe
+      - isNotNull:
+          path: spec.template.spec.containers[0].readinessProbe

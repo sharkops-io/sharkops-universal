@@ -228,36 +228,74 @@ extraVolumeMounts: []
 
 # Health checks and probes
 # These are generic Kubernetes health check configurations
+# Shared HTTP endpoint for both probes. Most apps expose one health path and
+# want liveness and readiness pointed at it - set it once here rather than
+# twice below.
+#
+# `enabled: false` is the master switch: it drops BOTH probes, for apps with
+# no HTTP endpoint to probe at all.
+#
+# NOTE: `port` is a port NAME from service.ports[], not a number.
+#
+# Timing lives on the individual probes, not here - liveness and readiness
+# want different initialDelaySeconds, so a single shared value would be
+# actively wrong. (Prior to 0.17.0 this block also carried
+# initialDelaySeconds/periodSeconds/timeoutSeconds/failureThreshold keys.
+# Nothing read them - nothing read ANY of this block - so they are gone
+# rather than left to look meaningful.)
 healthCheck:
   enabled: true
   path: /
-  port: 80
-  initialDelaySeconds: 30
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 3
+  port: http
 
-# Liveness probe configuration
+# Liveness probe configuration.
+# httpGet.path / httpGet.port override healthCheck above for this probe only;
+# leave them unset to inherit.
 livenessProbe:
   enabled: true
-  httpGet:
-    path: /
-    port: http
+  httpGet: {}
   initialDelaySeconds: 10
   periodSeconds: 10
   timeoutSeconds: 5
   failureThreshold: 3
 
-# Readiness probe configuration
+# Readiness probe configuration. Same override semantics as livenessProbe.
 readinessProbe:
   enabled: true
-  httpGet:
-    path: /
-    port: http
+  httpGet: {}
   initialDelaySeconds: 2
   periodSeconds: 5
   timeoutSeconds: 3
   failureThreshold: 3
+
+# Grafana dashboards shipped with the release, as ConfigMaps labelled for the
+# kube-prometheus-stack Grafana sidecar to discover. Keeps a dashboard in the
+# same repo and the same diff as the exporter whose metrics it queries.
+#
+# `dashboards` maps a name to the dashboard JSON as a STRING. In a helmfile
+# values file use the .gotmpl extension and readFile, so the JSON stays a real,
+# diffable file on disk:
+#
+#   grafanaDashboards:
+#     enabled: true
+#     dashboards:
+#       my-app: |
+#         {{ readFile "dashboards/my-app.json" | indent 8 | trim }}
+#
+# Each entry becomes its own ConfigMap named <release>-<key>, with the JSON
+# under the data key <key>.json. The JSON is emitted verbatim - Grafana's
+# {{label}} legendFormat syntax passes through untouched, which is exactly why
+# this is not built on extraObjects (see templates/grafana-dashboards.yaml).
+grafanaDashboards:
+  enabled: false
+  # The sidecar's watch label. Must match Grafana's LABEL / LABEL_VALUE env.
+  label: grafana_dashboard
+  labelValue: "1"
+  # Extra labels/annotations on every dashboard ConfigMap. `grafana_folder`
+  # is the usual reason to set labels here.
+  labels: {}
+  annotations: {}
+  dashboards: {}
 
 # Service Account
 serviceAccount:
