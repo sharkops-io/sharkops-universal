@@ -86,6 +86,13 @@ helm install my-app ./sharkops-universal \
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `image.pullSecrets` | Image pull secrets | `[]` |
 
+### Command/Args Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `command` | Overrides the image ENTRYPOINT. Empty renders nothing. | `[]` |
+| `args` | Arguments passed to the container. Required for images whose entrypoint is a multi-subcommand binary (e.g. `itzg/mc-monitor` needs `export-for-prometheus`). Empty renders nothing. | `[]` |
+
 ### Deployment Configuration
 
 | Parameter | Description | Default |
