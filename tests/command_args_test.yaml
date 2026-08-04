@@ -1,0 +1,52 @@
+suite: test command and args
+templates:
+  - deployment.yaml
+tests:
+  - it: should omit command and args by default
+    set:
+      image:
+        repository: itzg/mc-monitor
+        tag: 0.17.0
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].command
+      - isNull:
+          path: spec.template.spec.containers[0].args
+
+  - it: should render args alone when only args is set
+    set:
+      image:
+        repository: itzg/mc-monitor
+        tag: 0.17.0
+      args:
+        - export-for-prometheus
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value:
+            - export-for-prometheus
+      - isNull:
+          path: spec.template.spec.containers[0].command
+
+  - it: should render command and args together
+    set:
+      image:
+        repository: itzg/mc-monitor
+        tag: 0.17.0
+      command:
+        - /mc-monitor
+      args:
+        - export-for-prometheus
+        - -port
+        - "8080"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value:
+            - /mc-monitor
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value:
+            - export-for-prometheus
+            - -port
+            - "8080"
