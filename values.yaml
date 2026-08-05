@@ -441,6 +441,42 @@ oauth2proxy:
 # Extra arbitrary Kubernetes objects to render alongside the release.
 # Each entry is a full Kubernetes manifest; go template expressions are supported.
 # These resources are owned by the Helm release (upgraded and deleted with it).
+# ExternalSecret objects (requires External Secrets Operator + a ClusterSecretStore).
+#
+# Each entry produces one ExternalSecret. The generated Kubernetes Secret keeps
+# the entry's `name` by default, so migrating an app off a hand-written Secret
+# needs no change to env.secrets / envFrom / secretMounts - only the thing that
+# CREATES the Secret changes.
+#
+# Pair with deploymentAnnotations below: ESO updates the Secret in place when a
+# value is rotated in OpenBao, and nothing about that changes the Deployment, so
+# without Reloader the pod keeps serving the old value indefinitely. The
+# checksum/extra-config annotation does NOT help - it hashes extraObjects, and
+# an ESO-managed Secret is created outside Helm entirely.
+#
+# externalSecrets:
+#   # whole path -> every key in OpenBao becomes a key in the Secret
+#   - name: unpoller-unifi
+#     refreshInterval: 1h
+#     dataFrom:
+#       - key: kv/apps/unifi
+#
+#   # explicit mapping, when the Secret's key names must differ from OpenBao's
+#   - name: myapp-creds
+#     data:
+#       - secretKey: MYAPP_PASSWORD
+#         remoteRef:
+#           key: kv/apps/myapp
+#           property: password
+externalSecrets: []
+
+# Annotations for the Deployment object itself (NOT the pod template - that is
+# podAnnotations). Reloader reads its annotations from the Deployment:
+#
+#   reloader.stakater.com/auto: "true"           any mounted ConfigMap/Secret
+#   secret.reloader.stakater.com/reload: "name"  one named Secret
+deploymentAnnotations: {}
+
 extraObjects: []
 # Example:
 # extraObjects:

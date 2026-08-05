@@ -4,6 +4,15 @@ metadata:
   name: {{ include "common.names.deploymentName" . }}
   labels:
     {{- include "common.labels.standard" . | nindent 4 }}
+  {{- with .Values.deploymentAnnotations }}
+  {{- /*
+  On the Deployment, deliberately NOT on the pod template (that is
+  podAnnotations). Reloader reads reloader.stakater.com/* from the Deployment
+  object, so putting them on the pod template silently does nothing.
+  */}}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
