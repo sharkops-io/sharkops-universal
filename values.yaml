@@ -384,6 +384,25 @@ secretMounts: []
 # cleanly and leaving the old file loaded.
 podAnnotations: {}
 
+# Init containers, run to completion in order before the main container starts.
+# Use standard Kubernetes container spec. Volumes defined under persistence are
+# available to mount here via volumeMounts -- the config PVC is always named
+# `config`, so an init container can prepare on-disk state the app then reads.
+#
+# Note these inherit the pod-level securityContext above (runAsUser 1000 by
+# default), so they cannot write files owned by root unless that is overridden
+# per-container.
+initContainers: []
+  # Example:
+  # - name: seed-config
+  #   image: busybox:1.37
+  #   command: ["/bin/sh", "-c"]
+  #   args:
+  #     - test -f /config/app.conf || cp /defaults/app.conf /config/app.conf
+  #   volumeMounts:
+  #     - name: config
+  #       mountPath: /config
+
 # Extra sidecar containers injected into the pod alongside the main container.
 # Use standard Kubernetes container spec. Volumes defined under persistence are
 # available to mount here via volumeMounts.

@@ -1,0 +1,94 @@
+suite: test init containers
+templates:
+  - deployment.yaml
+tests:
+  - it: should omit initContainers by default
+    set:
+      image:
+        repository: itzg/mc-monitor
+        tag: 0.17.0
+    asserts:
+      - isNull:
+          path: spec.template.spec.initContainers
+
+  - it: should render a single init container when set
+    set:
+      image:
+        repository: itzg/mc-monitor
+        tag: 0.17.0
+      initContainers:
+        - name: seed-config
+          image: busybox:1.37
+          command: ["/bin/sh", "-c"]
+          args:
+            - test -f /config/app.conf || cp /defaults/app.conf /config/app.conf
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 1
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: seed-config
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: busybox:1.37
+
+  - it: should preserve order of multiple init containers
+    set:
+      image:
+        repository: itzg/mc-monitor
+        tag: 0.17.0
+      initContainers:
+        - name: first
+          image: busybox:1.37
+        - name: second
+          image: busybox:1.37
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 2
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: first
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: second
+
+  - it: should let an init container mount the config PVC volume
+    set:
+      image:
+        repository: itzg/mc-monitor
+        tag: 0.17.0
+      persistence:
+        enabled: true
+        mountPath: /config
+      initContainers:
+        - name: seed-config
+          image: busybox:1.37
+          volumeMounts:
+            - name: config
+              mountPath: /config
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].name
+          value: config
+      # the pod must actually define the volume the init container references
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: config
+            persistentVolumeClaim:
+              claimName: RELEASE-NAME
+
+  - it: should still render the main container alongside init containers
+    set:
+      image:
+        repository: itzg/mc-monitor
+        tag: 0.17.0
+      initContainers:
+        - name: seed-config
+          image: busybox:1.37
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
