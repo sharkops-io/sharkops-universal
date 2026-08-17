@@ -27,6 +27,16 @@ args: []
 # Deployment settings
 replicas: 1
 revisionHistoryLimit: 1  # Number of old ReplicaSets to keep for rollbacks
+# type: RollingUpdate | Recreate
+#
+# Use Recreate for a single-replica app on a ReadWriteOnce volume: the default
+# maxSurge: 1 starts the replacement pod before the old one is gone, and if the
+# two land on different nodes the new pod blocks on Multi-Attach until the old
+# attachment releases. The rollingUpdate block below is only rendered for type
+# RollingUpdate, because apps/v1 rejects it alongside Recreate.
+#
+# `maxSurge: 0` under RollingUpdate is equivalent at replicas: 1 and is what
+# releases pinned to an older chart version have to use.
 strategy:
   type: RollingUpdate
   rollingUpdate:
