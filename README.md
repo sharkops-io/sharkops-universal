@@ -99,9 +99,11 @@ helm install my-app ./sharkops-universal \
 |-----------|-------------|---------|
 | `replicas` | Number of pod replicas | `1` |
 | `revisionHistoryLimit` | Number of old ReplicaSets to keep for rollbacks | `3` |
-| `strategy.type` | Deployment strategy type | `RollingUpdate` |
-| `strategy.rollingUpdate.maxUnavailable` | Maximum unavailable pods during update | `1` |
-| `strategy.rollingUpdate.maxSurge` | Maximum pods that can be created above desired count | `1` |
+| `strategy.type` | Deployment strategy type — `RollingUpdate` or `Recreate` | `RollingUpdate` |
+| `strategy.rollingUpdate.maxUnavailable` | Maximum unavailable pods during update (RollingUpdate only) | `1` |
+| `strategy.rollingUpdate.maxSurge` | Maximum pods that can be created above desired count (RollingUpdate only) | `1` |
+
+**Note on `Recreate`**: use it for a single-replica app on a ReadWriteOnce volume. The default `maxSurge: 1` starts the replacement pod before the old one is gone, and when the two land on different nodes the new pod blocks on `Multi-Attach error for volume ...` until the old attachment releases — an unbounded stall during which the app is down. The `rollingUpdate` block is rendered **only** for `type: RollingUpdate`, since apps/v1 rejects the field alongside `Recreate`. On chart versions before 0.23.0, `Recreate` renders cleanly and then fails at apply; use `strategy.rollingUpdate.maxSurge: 0` there instead, which is equivalent at `replicas: 1`.
 
 **Note**: The `revisionHistoryLimit` controls how many old ReplicaSets are kept after upgrades. This helps with rollback capabilities but also prevents old ReplicaSets from accumulating indefinitely. The default of `3` keeps the current ReplicaSet plus 2 previous versions.
 

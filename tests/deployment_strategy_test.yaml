@@ -1,0 +1,60 @@
+suite: test deployment strategy
+templates:
+  - deployment.yaml
+tests:
+  # The default path every existing consumer is on. Pinned so making Recreate
+  # expressible cannot quietly change what a RollingUpdate release renders.
+  - it: should render the rollingUpdate block for the default RollingUpdate type
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 1
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 1
+
+  # apps/v1 forbids rollingUpdate when the type is Recreate ("Present only if
+  # DeploymentStrategyType = RollingUpdate"), so emitting it unconditionally
+  # made Recreate inexpressible: it rendered cleanly and failed at apply.
+  - it: should omit the rollingUpdate block when type is Recreate
+    set:
+      strategy:
+        type: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - notExists:
+          path: spec.strategy.rollingUpdate
+
+  # The realistic case: values.yaml always supplies rollingUpdate defaults, so
+  # a release setting only `type: Recreate` still has them in merged values.
+  - it: should omit the rollingUpdate block for Recreate even when its values are set
+    set:
+      strategy:
+        type: Recreate
+        rollingUpdate:
+          maxUnavailable: 1
+          maxSurge: 1
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - notExists:
+          path: spec.strategy.rollingUpdate
+
+  # maxSurge: 0 is how a single-replica ReadWriteOnce release avoids two pods
+  # existing at once (Multi-Attach on the volume). A `default` helper anywhere
+  # in this path would silently turn 0 back into 1.
+  - it: should preserve maxSurge 0
+    set:
+      strategy:
+        rollingUpdate:
+          maxSurge: 0
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 0

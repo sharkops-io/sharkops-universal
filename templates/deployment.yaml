@@ -18,9 +18,19 @@ spec:
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   strategy:
     type: {{ .Values.strategy.type }}
+    {{- /*
+    rollingUpdate ONLY under type RollingUpdate. apps/v1 rejects the field
+    alongside type Recreate ("Present only if DeploymentStrategyType =
+    RollingUpdate"), and values.yaml always supplies rollingUpdate defaults --
+    so emitting it unconditionally made `type: Recreate` inexpressible: it
+    rendered cleanly and then failed at apply. A single-replica ReadWriteOnce
+    release wanting no pod overlap had to spell it `maxSurge: 0` instead.
+    */}}
+    {{- if eq .Values.strategy.type "RollingUpdate" }}
     rollingUpdate:
       maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable }}
       maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge }}
+    {{- end }}
   selector:
     matchLabels:
       {{- include "common.labels.selectorLabels" . | nindent 6 }}
