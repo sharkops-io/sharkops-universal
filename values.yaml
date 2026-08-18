@@ -518,23 +518,3 @@ extraObjects: []
 #         {{- include "common.labels.standard" . | nindent 8 }}
 #     data:
 #       key: value
-
-# Default-deny ingress for this release's pods, plus an explicit allowlist.
-# INGRESS ONLY -- egress is deliberately untouched, because ingress rules
-# cannot break DNS, outbound HTTP, image pulls or webhook posts. See
-# example-org/talos docs/2026-08-15-network-policy-default-deny-design.md.
-networkPolicy:
-  enabled: false
-  # Allow Prometheus to scrape. Defaults TRUE because forgetting it does not
-  # fail loudly - the namespace just stops being scraped, the target goes down,
-  # and nothing else reports a problem.
-  allowPrometheus: true
-  # Allow traffic arriving via the Cilium ingress path.
-  allowIngressController: true
-  # Extra labels ANDed into the podSelector, for a release whose policy should
-  # cover only some of its pods.
-  extraPodSelectorLabels: {}
-  # Raw NetworkPolicyIngressRule entries, appended verbatim. This is where an
-  # app declares its real callers - e.g. the CNPG operator, which dials INTO
-  # database pods on :8000.
-  extraIngress: []
