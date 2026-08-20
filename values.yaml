@@ -518,3 +518,37 @@ extraObjects: []
 #         {{- include "common.labels.standard" . | nindent 8 }}
 #     data:
 #       key: value
+
+# Pod DNS settings.
+#
+# THE REASON THIS EXISTS: `ndots`. kubelet writes `ndots:5` into every pod's
+# /etc/resolv.conf, which means any name with FEWER than five dots is treated as
+# RELATIVE and walked through the three-entry search path first. So
+# `sonarr.plex.svc.cluster.local` (four dots) and Plex's
+# `<ip>.<hash>.plex.direct` (three dots) each cost THREE NXDOMAIN lookups before
+# the real answer. Measured 2026-08-20: 75% of one app's DNS requests were
+# wasted search expansions, and NXDOMAIN was ~72% of all cluster DNS responses.
+#
+# ndots CANNOT be fixed server-side. It is a client resolver setting, and the
+# decision is made before a packet exists -- CoreDNS only ever sees the query the
+# client already committed to. CoreDNS `autopath` is the partial workaround and
+# is deployed, but it cannot help clients that emit every search variant anyway,
+# which is what the musl/Alpine images in this cluster do.
+#
+# `ndots: 2` is the safe setting, NOT lower. Short names keep working: `sonarr`
+# (0 dots) still uses the search path and hits on its first expansion, and
+# `sonarr.plex` (1 dot) is unchanged. Only names with two or more dots become
+# absolute-first -- exactly the class that was being wasted.
+#
+# Proven on tautulli: search-expanded requests went 75% -> 0%, and the namespace's
+# NXDOMAIN rate fell ~95%.
+#
+#   dnsConfig:
+#     options:
+#       - name: ndots
+#         value: "2"
+dnsConfig: {}
+
+# Override the pod dnsPolicy. Leave unset for the Kubernetes default
+# (ClusterFirst). Setting dnsConfig above does NOT require changing this.
+dnsPolicy: ""
