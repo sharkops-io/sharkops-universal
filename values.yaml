@@ -452,7 +452,7 @@ oauth2proxy:
   enabled: false
   image:
     repository: quay.io/oauth2-proxy/oauth2-proxy
-    tag: v7.9.0
+    tag: v7.15.4
   issuerUrl: https://auth.example.com
   clientId: oauth2-proxy
   redirectUrl: ""  # Required when enabled: https://yourapp.example.com/oauth2/callback
