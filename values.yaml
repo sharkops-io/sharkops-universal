@@ -275,6 +275,27 @@ securityContext:
 #       type: RuntimeDefault
 containerSecurityContext: {}
 
+# Kubernetes' legacy service-link environment variables.
+#
+# For every Service in the namespace, Kubernetes injects
+# `<SVCNAME>_PORT=tcp://<clusterIP>:<port>` (plus _SERVICE_HOST, _PORT_n_TCP_*)
+# into every pod. Harmless until an application reads its own configuration
+# from variables prefixed with its own name -- then the SERVICE NAME collides
+# with the app's config namespace.
+#
+# Trilium hit this on 2026-08-30 and crash-looped on startup:
+#
+#   FATAL ERROR: Invalid port value "tcp://10.102.169.151:80" from environment
+#   variable TRILIUM_PORT, should be an integer between 0 and 65536.
+#
+# Set false for any app whose env vars share a prefix with its Service name.
+# Nothing in this cluster is known to depend on service links -- they predate
+# cluster DNS -- but the default stays true so existing releases are untouched.
+#
+# Only `false` renders. Leaving it true emits nothing, because emitting the
+# Kubernetes default would change every consumer's pod template and roll them.
+enableServiceLinks: true
+
 # Scheduling priority. Empty renders nothing (the cluster's global default
 # applies). A node-level DaemonSet generally wants `system-node-critical` so
 # node pressure evicts the workloads it serves rather than the agent serving

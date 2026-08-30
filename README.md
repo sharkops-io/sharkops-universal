@@ -6,6 +6,7 @@ A universal Helm chart for deploying any Docker container on Kubernetes. This ch
 
 - **Universal Design**: Deploy any Docker container with minimal configuration
 - **Deployment or DaemonSet**: one pod spec, either controller — `kind: DaemonSet` for node-level agents
+- **Service-link control**: opt out of Kubernetes' injected `<SVC>_PORT` vars when they collide with an app's own config
 - **Pod and Container Security Contexts**: both levels, so PodSecurity `baseline`/`restricted` are satisfiable
 - **Self-Contained**: No external dependencies, uses custom templates for maximum flexibility
 - **Flexible Configuration**: Support for multiple volumes, environment variables, and probes
@@ -615,6 +616,25 @@ securityContext:
 ```
 
 The same applies to any other map in these values, `env.values` included.
+
+### Service Links
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `enableServiceLinks` | Kubernetes' legacy service-link env vars | `true` |
+
+For every Service in the namespace, Kubernetes injects `<SVCNAME>_PORT=tcp://<clusterIP>:<port>` (plus `_SERVICE_HOST` and `_PORT_n_TCP_*`) into every pod. Harmless — until an application reads its own configuration from variables prefixed with its own name. Then the **Service name collides with the app's config namespace**:
+
+```
+FATAL ERROR: Invalid port value "tcp://10.102.169.151:80" from environment
+variable TRILIUM_PORT, should be an integer between 0 and 65536.
+```
+
+Set `enableServiceLinks: false` for any app whose env vars share a prefix with its Service name.
+
+**Only `false` renders.** Leaving it `true` — or setting it explicitly to `true` — emits nothing. Kubernetes defaults it to true and materialises it on the *Pod*, but not on the Deployment's pod *template*, which is what the pod-template hash is computed from. Emitting the default would change every consumer's template and roll all of them for no behavioural difference.
+
+A `null` is treated as unset, not as false. (`not nil` is true in Go templates, so without a `kindIs` guard a null would silently disable service links.)
 
 ### Scheduling Priority
 
