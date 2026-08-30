@@ -406,6 +406,23 @@ rbac:
 # Environment variables and secrets management
 # This section allows you to manage environment variables from multiple sources
 env:
+  # Explicit ENV-NAME -> secret/key mapping, for when the env var name and the
+  # secret key differ.
+  #
+  # `secrets:` below cannot express that -- it names the env var after the key,
+  # which is fine for a secret you author and wrong for one an operator
+  # generates. CloudNativePG writes `password` into <cluster>-app; an app
+  # wanting VIKUNJA_DATABASE_PASSWORD had no way to say so.
+  #
+  #   secretRefs:
+  #     - name: VIKUNJA_DATABASE_PASSWORD   # the env var inside the container
+  #       secret: vikunja-database-app      # the Secret to read
+  #       key: password                     # the key within it
+  #
+  # All three fields are required; omitting one is a render error rather than a
+  # half-formed secretKeyRef that the API server rejects at apply.
+  secretRefs: []
+
   # Direct environment variables (key-value pairs)
   # These will be set directly in the container
   values:

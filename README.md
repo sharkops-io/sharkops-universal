@@ -384,6 +384,23 @@ Each volume in `persistence.volumes` can have its own persistence configuration:
 
 ### Environment Variables and Secrets
 
+#### `env.secretRefs` — env name ≠ secret key
+
+Use this when the environment variable's name and the secret's key differ, which is the normal case for a credential an operator generated rather than one you authored. CloudNativePG writes `password` into `<cluster>-app`; the app wants `VIKUNJA_DATABASE_PASSWORD`.
+
+```yaml
+env:
+  secretRefs:
+    - name: VIKUNJA_DATABASE_PASSWORD   # the env var inside the container
+      secret: vikunja-database-app      # the Secret to read
+      key: password                     # the key within it
+```
+
+`env.secrets` cannot express this — it names the env var **after the key**, so it only works for secrets whose keys you chose. The alternatives before this existed were an `envFrom` that dumps every key of the secret into the environment under the operator's names, or wrapping the image's entrypoint in a shell to re-export the value.
+
+All three fields are required. Omitting one is a render error naming the offending entry, rather than a half-formed `secretKeyRef` the API server rejects at apply.
+
+
 The chart supports multiple ways to manage environment variables and secrets:
 
 | Parameter | Description | Default |
