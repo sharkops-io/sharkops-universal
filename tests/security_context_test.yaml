@@ -1,0 +1,89 @@
+suite: test security contexts and scheduling priority
+templates:
+  - deployment.yaml
+tests:
+  # Pins the pre-existing default so adding a container-level block cannot
+  # disturb the pod-level one every current consumer relies on.
+  - it: should render the pod-level security context by default
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 1000
+
+  # Both new keys are empty by default and must render NOTHING -- an empty
+  # `securityContext: {}` on the container would be a visible diff on all 22
+  # live releases.
+  - it: should render no container security context and no priority class by default
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].securityContext
+      - notExists:
+          path: spec.template.spec.priorityClassName
+
+  - it: should render container-level security context on the main container
+    set:
+      containerSecurityContext:
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop[0]
+          value: ALL
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  # The two blocks carry different fields and must both survive -- setting one
+  # must not overwrite or suppress the other.
+  - it: should keep pod-level and container-level contexts independent
+    set:
+      containerSecurityContext:
+        readOnlyRootFilesystem: true
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - notExists:
+          path: spec.template.spec.containers[0].securityContext.runAsUser
+
+  # The container block applies to the MAIN container only. oauth2-proxy is a
+  # vendored sidecar with its own spec, and silently hardening it would change
+  # a container this key does not describe.
+  - it: should not apply the container security context to the oauth2-proxy sidecar
+    set:
+      containerSecurityContext:
+        readOnlyRootFilesystem: true
+      oauth2proxy:
+        enabled: true
+        existingSecret: oauth2-secret
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: oauth2-proxy
+      - notExists:
+          path: spec.template.spec.containers[1].securityContext
+
+  - it: should render priorityClassName when set
+    set:
+      kind: DaemonSet
+      priorityClassName: system-node-critical
+    asserts:
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: system-node-critical

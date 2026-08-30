@@ -24,7 +24,24 @@ image:
 command: []
 args: []
 
+# Workload kind: Deployment | DaemonSet
+#
+# The pod template is identical for both -- every value below that shapes the
+# pod (image, env, volumes, probes, nodeSelector, tolerations, ...) applies
+# unchanged. Only three fields differ, and the template renders exactly the
+# right ones per kind:
+#
+#   Deployment | replicas, strategy
+#   DaemonSet  | updateStrategy (one pod per matching node; replicas has no
+#              | meaning and setting it is a RENDER ERROR, not a silent no-op)
+#
+# A DaemonSet with no Service almost always wants `service.ports: []` and
+# `healthCheck.enabled: false` as well -- the default probe targets the port
+# named `http`, which stops existing the moment service.ports is emptied.
+kind: Deployment
+
 # Deployment settings
+# replicas applies to kind: Deployment ONLY.
 replicas: 1
 revisionHistoryLimit: 1  # Number of old ReplicaSets to keep for rollbacks
 # type: RollingUpdate | Recreate
@@ -37,11 +54,31 @@ revisionHistoryLimit: 1  # Number of old ReplicaSets to keep for rollbacks
 #
 # `maxSurge: 0` under RollingUpdate is equivalent at replicas: 1 and is what
 # releases pinned to an older chart version have to use.
+#
+# Applies to kind: Deployment ONLY -- see updateStrategy below for DaemonSet.
 strategy:
   type: RollingUpdate
   rollingUpdate:
     maxUnavailable: 1  # Maximum number of pods that can be unavailable during update
     maxSurge: 1        # Maximum number of pods that can be created above desired count
+
+# DaemonSet rollout. Applies to kind: DaemonSet ONLY.
+#
+# type: RollingUpdate | OnDelete  (Recreate is a Deployment-only type and is
+# rejected here; OnDelete is likewise rejected for a Deployment.)
+#
+# This is a SEPARATE key from `strategy` rather than a reuse of it because the
+# two have the same shape but incompatible defaults: apps/v1 rejects a
+# DaemonSet whose maxUnavailable AND maxSurge are both non-zero
+# ("may not be set to a non-zero value when maxSurge is non-zero"), so
+# `strategy`'s 1/1 default would make every DaemonSet fail at apply while
+# rendering perfectly. Defaults here are the DaemonSet-legal 1/0, and the
+# illegal pair is a render error rather than something the API rejects later.
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1  # Pods taken down at a time during a rollout
+    maxSurge: 0        # Must be 0 unless maxUnavailable is 0
 
 # Service settings
 service:
@@ -218,6 +255,32 @@ securityContext:
   runAsUser: 1000
   runAsGroup: 1000
   fsGroup: 1000
+
+# Container-level security context, applied to the main container only.
+#
+# NOT interchangeable with the pod-level block above -- the two carry different
+# fields. runAsUser/runAsGroup/fsGroup are pod-spec fields; allowPrivilegeEscalation,
+# capabilities, readOnlyRootFilesystem and seLinuxOptions exist only here.
+# PodSecurity's baseline/restricted profiles name the container-level ones
+# specifically, so a workload cannot satisfy them from the pod block alone.
+#
+# Empty by default: renders nothing, so no existing release changes.
+#
+#   containerSecurityContext:
+#     readOnlyRootFilesystem: true
+#     allowPrivilegeEscalation: false
+#     capabilities:
+#       drop: ["ALL"]
+#     seccompProfile:
+#       type: RuntimeDefault
+containerSecurityContext: {}
+
+# Scheduling priority. Empty renders nothing (the cluster's global default
+# applies). A node-level DaemonSet generally wants `system-node-critical` so
+# node pressure evicts the workloads it serves rather than the agent serving
+# them -- a device plugin evicted off a node takes its advertised resource
+# with it, and every pod requesting that resource goes Pending.
+priorityClassName: ""
 
 # Resources
 # Uncomment and adjust as needed for your workload

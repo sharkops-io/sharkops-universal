@@ -1,0 +1,109 @@
+# Example values for a node-level agent rendered as a DaemonSet rather than a
+# Deployment — here the Intel GPU device plugin, which advertises each node's
+# QuickSync-capable iGPU to the scheduler as `gpu.intel.com/i915`.
+#
+# Everything below the `kind` line is ordinary pod configuration and means the
+# same thing it would under a Deployment.
+kind: DaemonSet
+
+image:
+  repository: intel/intel-gpu-plugin
+  tag: "0.36.0"
+  pullPolicy: IfNotPresent
+
+# -shared-dev-num is how many containers may share one physical GPU. The
+# upstream default of 1 means the first workload scheduled onto a node holds
+# the iGPU exclusively; media transcode is the case the plugin's own docs name
+# for raising it.
+args:
+  - -shared-dev-num=4
+
+# A device plugin registers with the kubelet over a unix socket in
+# /var/lib/kubelet/device-plugins and serves no traffic — so no Service, and
+# no HTTP probe. Both have to be turned off explicitly: the default probe
+# targets a port named `http`, which stops existing the moment ports is empty.
+service:
+  ports: []
+healthCheck:
+  enabled: false
+
+# The chart's default (uid/gid 1000) cannot write the kubelet's socket
+# directory; this image ships as root and needs to stay that way.
+#
+# Note the explicit nulls. Helm MERGES maps, so `securityContext: {}` leaves
+# the chart's defaults fully intact — it renders runAsUser 1000 and looks like
+# it worked. Each key has to be nulled by name to actually remove it.
+securityContext:
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+
+# Container-level hardening, matching what the vendor's own DaemonSet ships.
+# These fields do not exist on the pod-level block above.
+#
+# (Upstream also sets seLinuxOptions.type: container_device_plugin_t. Omitted
+# here: it is inert without SELinux, and PodSecurity's restricted profile
+# allows only a fixed set of SELinux types, so carrying it would trade a real
+# warning for a cosmetic one.)
+containerSecurityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+# A device plugin evicted off a node takes its advertised resource with it, and
+# every pod requesting that resource goes Pending. It should outlive the
+# workloads it serves under node pressure.
+priorityClassName: system-node-critical
+
+# The node's render devices and the kubelet socket directory, mounted from the
+# host — hostPath is expressed through extraVolumes like any other volume type.
+extraVolumes:
+  - name: devfs
+    hostPath:
+      path: /dev/dri
+  - name: sysfsdrm
+    hostPath:
+      path: /sys/class/drm
+  - name: kubeletsockets
+    hostPath:
+      path: /var/lib/kubelet/device-plugins
+  - name: cdipath
+    hostPath:
+      path: /var/run/cdi
+      type: DirectoryOrCreate
+
+extraVolumeMounts:
+  - name: devfs
+    mountPath: /dev/dri
+    readOnly: true
+  - name: sysfsdrm
+    mountPath: /sys/class/drm
+    readOnly: true
+  - name: kubeletsockets
+    mountPath: /var/lib/kubelet/device-plugins
+  - name: cdipath
+    mountPath: /var/run/cdi
+
+nodeSelector:
+  kubernetes.io/arch: amd64
+
+resources:
+  requests:
+    cpu: 40m
+    memory: 45Mi
+  limits:
+    cpu: 100m
+    memory: 90Mi
+
+# The chart's LinuxServer.io-shaped PUID/PGID/TZ defaults mean nothing to this
+# image. Same merge caveat as securityContext above: `values: {}` would leave
+# all three in place, so they are nulled individually.
+env:
+  values:
+    PUID: null
+    PGID: null
+    TZ: null
