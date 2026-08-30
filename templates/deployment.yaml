@@ -115,6 +115,22 @@ spec:
         {{- include "common.labels.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "common.serviceAccountName" . }}
+      {{- /*
+      Rendered ONLY when explicitly false, never when true.
+
+      Kubernetes defaults this to true, and the API server materialises it on
+      the POD -- but not on the Deployment's pod TEMPLATE, which is what the
+      pod-template hash is computed from. So emitting `enableServiceLinks: true`
+      would change the template of every existing consumer and roll all of them
+      for no behavioural difference. Verified against live objects before
+      choosing this shape.
+
+      Setting it explicitly to true therefore renders nothing, which is correct:
+      absent and true mean the same thing to Kubernetes.
+      */}}
+      {{- if and (kindIs "bool" .Values.enableServiceLinks) (not .Values.enableServiceLinks) }}
+      enableServiceLinks: false
+      {{- end }}
       {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
       {{- end }}

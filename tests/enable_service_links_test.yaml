@@ -1,0 +1,51 @@
+suite: test enableServiceLinks
+templates:
+  - deployment.yaml
+tests:
+  # THE LOAD-BEARING ASSERTION. Kubernetes defaults this to true and
+  # materialises it on the Pod -- but NOT on the Deployment's pod template,
+  # which is what the pod-template hash is computed from. Emitting it here
+  # would change the template of every existing release and roll all of them
+  # for no behavioural difference.
+  - it: should not render the key at all by default
+    asserts:
+      - notExists:
+          path: spec.template.spec.enableServiceLinks
+
+  # Same reasoning: absent and true mean the same thing to Kubernetes, so an
+  # explicit true must still render nothing.
+  - it: should still render nothing when explicitly set to true
+    set:
+      enableServiceLinks: true
+    asserts:
+      - notExists:
+          path: spec.template.spec.enableServiceLinks
+
+  # The case the key exists for: an app whose config env vars share a prefix
+  # with its Service name, e.g. Trilium reading TRILIUM_PORT while Kubernetes
+  # injects TRILIUM_PORT=tcp://<ip>:<port>.
+  - it: should render false when explicitly disabled
+    set:
+      enableServiceLinks: false
+    asserts:
+      - equal:
+          path: spec.template.spec.enableServiceLinks
+          value: false
+
+  # A nil must not be mistaken for false. `not nil` is true in Go templates, so
+  # without the kindIs guard a null would silently disable service links.
+  - it: should treat null as unset rather than as false
+    set:
+      enableServiceLinks: null
+    asserts:
+      - notExists:
+          path: spec.template.spec.enableServiceLinks
+
+  - it: should apply to a DaemonSet as well
+    set:
+      kind: DaemonSet
+      enableServiceLinks: false
+    asserts:
+      - equal:
+          path: spec.template.spec.enableServiceLinks
+          value: false
