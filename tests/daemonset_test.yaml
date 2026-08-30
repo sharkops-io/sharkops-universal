@@ -1,0 +1,179 @@
+suite: test workload kind (Deployment / DaemonSet)
+templates:
+  - deployment.yaml
+tests:
+  # The default every one of the 22 live consumers is on. Pinned so that adding
+  # a second kind cannot quietly change what an existing release renders.
+  - it: should render a Deployment with replicas and strategy by default
+    asserts:
+      - equal:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - notExists:
+          path: spec.updateStrategy
+
+  - it: should render a DaemonSet with updateStrategy and no replicas
+    set:
+      kind: DaemonSet
+    asserts:
+      - equal:
+          path: kind
+          value: DaemonSet
+      - equal:
+          path: apiVersion
+          value: apps/v1
+      # The whole point of the guard: replicas must be ABSENT, not present and
+      # ignored. A DaemonSet carrying spec.replicas is rejected by apps/v1.
+      - notExists:
+          path: spec.replicas
+      - notExists:
+          path: spec.strategy
+      - equal:
+          path: spec.updateStrategy.type
+          value: RollingUpdate
+
+  # values.yaml gives updateStrategy a DaemonSet-LEGAL 1/0 default. If it ever
+  # inherits `strategy`'s 1/1 the chart renders fine and every DaemonSet is
+  # rejected at apply with "may not be set to a non-zero value when maxSurge is
+  # non-zero" -- so the default itself is asserted, not just the plumbing.
+  - it: should default a DaemonSet rollout to the legal maxUnavailable 1 / maxSurge 0
+    set:
+      kind: DaemonSet
+    asserts:
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxUnavailable
+          value: 1
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxSurge
+          value: 0
+
+  - it: should omit rollingUpdate for a DaemonSet on OnDelete
+    set:
+      kind: DaemonSet
+      updateStrategy:
+        type: OnDelete
+    asserts:
+      - equal:
+          path: spec.updateStrategy.type
+          value: OnDelete
+      - notExists:
+          path: spec.updateStrategy.rollingUpdate
+
+  # The pod template is the reason one file renders both kinds: everything
+  # below spec.template must come out identically. Asserted on the DaemonSet
+  # so a future branch on kind cannot silently skip pod-level plumbing.
+  - it: should apply the shared pod-spec values to a DaemonSet unchanged
+    set:
+      kind: DaemonSet
+      image:
+        repository: intel/intel-gpu-plugin
+        tag: "0.36.0"
+      args: ["-shared-dev-num=4"]
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      extraVolumes:
+        - name: devfs
+          hostPath:
+            path: /dev/dri
+      extraVolumeMounts:
+        - name: devfs
+          mountPath: /dev/dri
+          readOnly: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: intel/intel-gpu-plugin:0.36.0
+      - equal:
+          path: spec.template.spec.containers[0].args[0]
+          value: -shared-dev-num=4
+      - equal:
+          path: spec.template.spec.nodeSelector["kubernetes.io/arch"]
+          value: amd64
+      - equal:
+          path: spec.template.spec.volumes[0].hostPath.path
+          value: /dev/dri
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /dev/dri
+
+  # A node daemon normally has no Service. Before the guard this rendered a
+  # bare `ports:` key (i.e. ports: null) into the container spec.
+  - it: should omit the container ports key entirely when there are no service ports
+    set:
+      kind: DaemonSet
+      service:
+        ports: []
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].ports
+
+  # --- the guards. Each must fail for its OWN reason, so every case asserts
+  # the message, not merely that rendering failed.
+
+  - it: should reject a kind that is neither Deployment nor DaemonSet
+    set:
+      kind: StatefulSet
+    asserts:
+      - failedTemplate:
+          errorMessage: 'sharkops-universal: kind must be Deployment or DaemonSet, got "StatefulSet"'
+
+  - it: should reject replicas on a DaemonSet rather than ignoring it
+    set:
+      kind: DaemonSet
+      replicas: 3
+    asserts:
+      - failedTemplate:
+          errorMessage: "sharkops-universal: replicas (3) has no meaning for kind: DaemonSet -- one pod per matching node is the definition. Use nodeSelector/affinity to choose nodes."
+
+  - it: should reject the Deployment-only Recreate type on a DaemonSet
+    set:
+      kind: DaemonSet
+      updateStrategy:
+        type: Recreate
+    asserts:
+      - failedTemplate:
+          errorMessage: 'sharkops-universal: updateStrategy.type must be RollingUpdate or OnDelete for a DaemonSet, got "Recreate" (Recreate is Deployment-only)'
+
+  - it: should reject the DaemonSet-only OnDelete type on a Deployment
+    set:
+      strategy:
+        type: OnDelete
+    asserts:
+      - failedTemplate:
+          errorMessage: 'sharkops-universal: strategy.type must be RollingUpdate or Recreate for a Deployment, got "OnDelete" (OnDelete is DaemonSet-only)'
+
+  # The realistic mistake: copying a working Deployment's 1/1 rollingUpdate
+  # onto a DaemonSet. Renders cleanly, rejected by the API server at apply.
+  - it: should reject a DaemonSet with both maxUnavailable and maxSurge non-zero
+    set:
+      kind: DaemonSet
+      updateStrategy:
+        rollingUpdate:
+          maxUnavailable: 1
+          maxSurge: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "sharkops-universal: a DaemonSet may not set both updateStrategy.rollingUpdate.maxUnavailable (1) and maxSurge (1) non-zero -- apps/v1 rejects it. Set one of them to 0."
+
+  # maxSurge-based DaemonSet rollouts are legal the other way round (surge up
+  # first, then take the old pod down) and must stay expressible.
+  - it: should allow a DaemonSet to surge instead, with maxUnavailable 0
+    set:
+      kind: DaemonSet
+      updateStrategy:
+        rollingUpdate:
+          maxUnavailable: 0
+          maxSurge: 1
+    asserts:
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxUnavailable
+          value: 0
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxSurge
+          value: 1

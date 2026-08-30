@@ -1,35 +1,77 @@
+{{- /*
+This template renders EITHER a Deployment or a DaemonSet from one pod spec.
+The pod template below is shared verbatim; only the three controller-level
+fields differ (replicas/strategy vs updateStrategy).
+
+The validation here exists because the alternative is the chart's worst
+failure mode: a values key that renders cleanly and then means nothing.
+`replicas: 3` under a DaemonSet, or `type: Recreate`, would both be dropped
+on the floor by a template that simply branched on kind -- the release would
+deploy and quietly not be what the values say. Each is a render error instead.
+*/}}
+{{- $kind := .Values.kind | default "Deployment" }}
+{{- if not (has $kind (list "Deployment" "DaemonSet")) }}
+{{- fail (printf "sharkops-universal: kind must be Deployment or DaemonSet, got %q" $kind) }}
+{{- end }}
+{{- $isDaemonSet := eq $kind "DaemonSet" }}
+{{- $rollout := ternary .Values.updateStrategy .Values.strategy $isDaemonSet }}
+{{- if $isDaemonSet }}
+{{- if ne (int (.Values.replicas | default 1)) 1 }}
+{{- fail (printf "sharkops-universal: replicas (%v) has no meaning for kind: DaemonSet -- one pod per matching node is the definition. Use nodeSelector/affinity to choose nodes." .Values.replicas) }}
+{{- end }}
+{{- if not (has $rollout.type (list "RollingUpdate" "OnDelete")) }}
+{{- fail (printf "sharkops-universal: updateStrategy.type must be RollingUpdate or OnDelete for a DaemonSet, got %q (Recreate is Deployment-only)" $rollout.type) }}
+{{- end }}
+{{- /*
+apps/v1: "may not be set to a non-zero value when maxSurge is non-zero".
+values.yaml defaults to the legal 1/0, so this only fires when a consumer
+copies a Deployment's 1/1 across -- which would otherwise render fine and be
+rejected by the API server at apply time.
+*/}}
+{{- if and (eq $rollout.type "RollingUpdate") (ne (int $rollout.rollingUpdate.maxUnavailable) 0) (ne (int $rollout.rollingUpdate.maxSurge) 0) }}
+{{- fail (printf "sharkops-universal: a DaemonSet may not set both updateStrategy.rollingUpdate.maxUnavailable (%v) and maxSurge (%v) non-zero -- apps/v1 rejects it. Set one of them to 0." $rollout.rollingUpdate.maxUnavailable $rollout.rollingUpdate.maxSurge) }}
+{{- end }}
+{{- else }}
+{{- if not (has $rollout.type (list "RollingUpdate" "Recreate")) }}
+{{- fail (printf "sharkops-universal: strategy.type must be RollingUpdate or Recreate for a Deployment, got %q (OnDelete is DaemonSet-only)" $rollout.type) }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
-kind: Deployment
+kind: {{ $kind }}
 metadata:
   name: {{ include "common.names.deploymentName" . }}
   labels:
     {{- include "common.labels.standard" . | nindent 4 }}
   {{- with .Values.deploymentAnnotations }}
   {{- /*
-  On the Deployment, deliberately NOT on the pod template (that is
-  podAnnotations). Reloader reads reloader.stakater.com/* from the Deployment
-  object, so putting them on the pod template silently does nothing.
+  On the controller object (Deployment or DaemonSet), deliberately NOT on the
+  pod template (that is podAnnotations). Reloader reads reloader.stakater.com/*
+  from the controller, so putting them on the pod template silently does
+  nothing.
   */}}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  {{- if not $isDaemonSet }}
   replicas: {{ .Values.replicas }}
+  {{- end }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
-  strategy:
-    type: {{ .Values.strategy.type }}
+  {{ if $isDaemonSet }}updateStrategy{{ else }}strategy{{ end }}:
+    type: {{ $rollout.type }}
     {{- /*
     rollingUpdate ONLY under type RollingUpdate. apps/v1 rejects the field
     alongside type Recreate ("Present only if DeploymentStrategyType =
-    RollingUpdate"), and values.yaml always supplies rollingUpdate defaults --
-    so emitting it unconditionally made `type: Recreate` inexpressible: it
-    rendered cleanly and then failed at apply. A single-replica ReadWriteOnce
-    release wanting no pod overlap had to spell it `maxSurge: 0` instead.
+    RollingUpdate") and alongside a DaemonSet's OnDelete, and values.yaml
+    always supplies rollingUpdate defaults -- so emitting it unconditionally
+    made `type: Recreate` inexpressible: it rendered cleanly and then failed at
+    apply. A single-replica ReadWriteOnce release wanting no pod overlap had to
+    spell it `maxSurge: 0` instead.
     */}}
-    {{- if eq .Values.strategy.type "RollingUpdate" }}
+    {{- if eq $rollout.type "RollingUpdate" }}
     rollingUpdate:
-      maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable }}
-      maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ $rollout.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ $rollout.rollingUpdate.maxSurge }}
     {{- end }}
   selector:
     matchLabels:
@@ -73,6 +115,9 @@ spec:
         {{- include "common.labels.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "common.serviceAccountName" . }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       {{- with .Values.runtimeClassName }}
       runtimeClassName: {{ . }}
       {{- end }}
@@ -90,6 +135,20 @@ spec:
         - name: {{ include "common.names.appName" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- /*
+          Container-level, distinct from the pod-level .Values.securityContext
+          above. The two are not interchangeable: runAsUser/fsGroup are pod
+          fields, while allowPrivilegeEscalation, capabilities and
+          readOnlyRootFilesystem exist ONLY here -- so without this key a
+          workload could not drop capabilities at all, and PodSecurity's
+          baseline/restricted checks that name those fields could never be
+          satisfied. Empty by default, so it renders nothing for every existing
+          consumer.
+          */}}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.command }}
           command:
             {{- toYaml . | nindent 12 }}
@@ -141,12 +200,19 @@ spec:
           envFrom:
             {{- toYaml .Values.envFrom | nindent 12 }}
           {{- end }}
+          {{- /*
+          Guarded: a workload with no Service (`service.ports: []`, the normal
+          shape for a node daemon) previously rendered a bare `ports:` key,
+          i.e. `ports: null`.
+          */}}
+          {{- with .Values.service.ports }}
           ports:
-            {{- range .Values.service.ports }}
+            {{- range . }}
             - name: {{ .name }}
               containerPort: {{ .targetPort }}
               protocol: {{ .protocol }}
             {{- end }}
+          {{- end }}
           {{- /*
           Probe paths/ports resolve per-probe first, then fall back to the
           shared .Values.healthCheck. `| default dict` guards against a

@@ -5,6 +5,8 @@ A universal Helm chart for deploying any Docker container on Kubernetes. This ch
 ## Features
 
 - **Universal Design**: Deploy any Docker container with minimal configuration
+- **Deployment or DaemonSet**: one pod spec, either controller — `kind: DaemonSet` for node-level agents
+- **Pod and Container Security Contexts**: both levels, so PodSecurity `baseline`/`restricted` are satisfiable
 - **Self-Contained**: No external dependencies, uses custom templates for maximum flexibility
 - **Flexible Configuration**: Support for multiple volumes, environment variables, and probes
 - **Security First**: Proper security contexts and user/group management
@@ -93,19 +95,63 @@ helm install my-app ./sharkops-universal \
 | `command` | Overrides the image ENTRYPOINT. Empty renders nothing. | `[]` |
 | `args` | Arguments passed to the container. Required for images whose entrypoint is a multi-subcommand binary (e.g. `itzg/mc-monitor` needs `export-for-prometheus`). Empty renders nothing. | `[]` |
 
+### Workload Kind (Deployment or DaemonSet)
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `kind` | Controller to render — `Deployment` or `DaemonSet` | `Deployment` |
+
+The pod template is identical for both. Every value that shapes the pod — image, command/args, env, volumes, probes, resources, `nodeSelector`, `tolerations`, `affinity`, `extraVolumes`/`extraVolumeMounts`, `extraContainers` — applies unchanged. Only the controller-level fields differ:
+
+| | Deployment | DaemonSet |
+|---|---|---|
+| Pod count | `replicas` | one per matching node |
+| Rollout | `strategy` | `updateStrategy` |
+| Rollout types | `RollingUpdate`, `Recreate` | `RollingUpdate`, `OnDelete` |
+
+Use `DaemonSet` for something that must run on every node rather than somewhere in the cluster: a node agent, a log shipper, a device plugin.
+
+```yaml
+kind: DaemonSet
+
+image:
+  repository: intel/intel-gpu-plugin
+  tag: "0.36.0"
+
+# No Service and no HTTP endpoint — both must be turned off explicitly, or the
+# default probe targets a port named `http` that no longer exists.
+service:
+  ports: []
+healthCheck:
+  enabled: false
+```
+
+**Wrong-kind values are render errors, not silent no-ops.** Setting `replicas` on a `DaemonSet`, or a `strategy.type` that belongs to the other kind, fails `helm template` with a message naming the key — rather than rendering cleanly and deploying something the values don't describe:
+
+```
+Error: sharkops-universal: replicas (3) has no meaning for kind: DaemonSet --
+one pod per matching node is the definition. Use nodeSelector/affinity to
+choose nodes.
+```
+
+**`updateStrategy` is a separate key from `strategy`, deliberately.** The two have the same shape but incompatible defaults: apps/v1 rejects a DaemonSet whose `maxUnavailable` **and** `maxSurge` are both non-zero (*"may not be set to a non-zero value when maxSurge is non-zero"*), so reusing `strategy`'s `1`/`1` default would make every DaemonSet render perfectly and then fail at apply. `updateStrategy` defaults to the DaemonSet-legal `maxUnavailable: 1` / `maxSurge: 0`, and the illegal pair is caught at render time.
+
 ### Deployment Configuration
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `replicas` | Number of pod replicas | `1` |
-| `revisionHistoryLimit` | Number of old ReplicaSets to keep for rollbacks | `3` |
-| `strategy.type` | Deployment strategy type — `RollingUpdate` or `Recreate` | `RollingUpdate` |
+| `replicas` | Number of pod replicas (**`kind: Deployment` only**) | `1` |
+| `revisionHistoryLimit` | Number of old ReplicaSets/ControllerRevisions to keep for rollbacks | `1` |
+| `strategy.type` | Deployment strategy type — `RollingUpdate` or `Recreate` (**`kind: Deployment` only**) | `RollingUpdate` |
 | `strategy.rollingUpdate.maxUnavailable` | Maximum unavailable pods during update (RollingUpdate only) | `1` |
 | `strategy.rollingUpdate.maxSurge` | Maximum pods that can be created above desired count (RollingUpdate only) | `1` |
+| `updateStrategy.type` | DaemonSet rollout type — `RollingUpdate` or `OnDelete` (**`kind: DaemonSet` only**) | `RollingUpdate` |
+| `updateStrategy.rollingUpdate.maxUnavailable` | Pods taken down at a time during a rollout | `1` |
+| `updateStrategy.rollingUpdate.maxSurge` | Pods surged above one-per-node; must be `0` unless `maxUnavailable` is `0` | `0` |
 
 **Note on `Recreate`**: use it for a single-replica app on a ReadWriteOnce volume. The default `maxSurge: 1` starts the replacement pod before the old one is gone, and when the two land on different nodes the new pod blocks on `Multi-Attach error for volume ...` until the old attachment releases — an unbounded stall during which the app is down. The `rollingUpdate` block is rendered **only** for `type: RollingUpdate`, since apps/v1 rejects the field alongside `Recreate`. On chart versions before 0.23.0, `Recreate` renders cleanly and then fails at apply; use `strategy.rollingUpdate.maxSurge: 0` there instead, which is equivalent at `replicas: 1`.
 
-**Note**: The `revisionHistoryLimit` controls how many old ReplicaSets are kept after upgrades. This helps with rollback capabilities but also prevents old ReplicaSets from accumulating indefinitely. The default of `3` keeps the current ReplicaSet plus 2 previous versions.
+**Note**: The `revisionHistoryLimit` controls how many old ReplicaSets (or, for a DaemonSet, ControllerRevisions) are kept after upgrades. This helps with rollback capabilities but also prevents old revisions from accumulating indefinitely. The default of `1` keeps the current revision plus one previous version.
 
 ### Service Configuration
 
@@ -519,11 +565,51 @@ here means the ConfigMap is created and silently ignored.
 
 ### Security Context
 
+Two separate blocks, carrying different fields. They are **not** interchangeable.
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `securityContext.runAsUser` | User ID to run as | `1000` |
-| `securityContext.runAsGroup` | Group ID to run as | `1000` |
-| `securityContext.fsGroup` | File system group | `1000` |
+| `securityContext.runAsUser` | User ID to run as (pod-level) | `1000` |
+| `securityContext.runAsGroup` | Group ID to run as (pod-level) | `1000` |
+| `securityContext.fsGroup` | File system group (pod-level) | `1000` |
+| `containerSecurityContext` | Container-level context, applied to the **main container only** | `{}` (omitted) |
+
+`runAsUser`/`runAsGroup`/`fsGroup` are pod-spec fields. `allowPrivilegeEscalation`, `capabilities`, `readOnlyRootFilesystem` and `seLinuxOptions` exist **only** at container level — PodSecurity's `baseline` and `restricted` profiles name those specifically, so they cannot be satisfied from the pod block:
+
+```yaml
+containerSecurityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+It is deliberately not applied to the `oauth2-proxy` sidecar, which has its own spec.
+
+**Clearing the pod-level defaults needs explicit nulls.** Helm merges maps, so `securityContext: {}` leaves `runAsUser: 1000` fully intact — it renders and looks like it worked. To actually run a container as the image ships it:
+
+```yaml
+securityContext:
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+```
+
+The same applies to any other map in these values, `env.values` included.
+
+### Scheduling Priority
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `priorityClassName` | PriorityClass for the pod | `""` (omitted) |
+
+Mostly relevant to `kind: DaemonSet`. A node agent should generally outlive the workloads it serves under node pressure — a device plugin evicted off a node takes its advertised resource with it, and every pod requesting that resource goes `Pending`:
+
+```yaml
+priorityClassName: system-node-critical
+```
 
 ### Resources
 
