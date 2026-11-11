@@ -4,9 +4,9 @@ description: A universal Helm chart for deploying any Docker container
 type: application
 version: 0.1.0
 appVersion: "latest"
-home: https://gitlab.com/sharkops/helm-charts/sharkops-universal
+home: https://github.com/sharkops-io/sharkops-universal
 sources:
-  - https://gitlab.com/sharkops/helm-charts/sharkops-universal
+  - https://github.com/sharkops-io/sharkops-universal
 maintainers:
   - name: Andrew Landsverk
     email: noreply@example.com

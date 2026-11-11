@@ -29,31 +29,31 @@ A universal Helm chart for deploying any Docker container on Kubernetes. This ch
 
 ### Install the Chart
 
-#### From GitLab Container Registry (OCI)
+#### From GitHub Container Registry (OCI)
 
 The OCI registry approach is the modern, recommended way to distribute Helm charts. Our chart is publicly accessible:
 
 ```bash
 # Install latest version from OCI registry (no authentication required)
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal
+helm install my-app oci://ghcr.io/sharkops-io/charts/sharkops-universal
 
 # Install specific version
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal --version 1.0.0
+helm install my-app oci://ghcr.io/sharkops-io/charts/sharkops-universal --version 1.0.0
 
 # Install with custom values
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal \
+helm install my-app oci://ghcr.io/sharkops-io/charts/sharkops-universal \
   -f examples/plex.yaml
 
 # Install with custom values and specific version
-helm install my-app oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal \
+helm install my-app oci://ghcr.io/sharkops-io/charts/sharkops-universal \
   --version 1.0.0 \
   -f examples/plex.yaml
 
 # Pull chart for inspection
-helm pull oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal --version 1.0.0
+helm pull oci://ghcr.io/sharkops-io/charts/sharkops-universal --version 1.0.0
 
 # Show chart information
-helm show chart oci://registry.gitlab.com/sharkops/helm-charts/sharkops-universal/sharkops-universal
+helm show chart oci://ghcr.io/sharkops-io/charts/sharkops-universal
 ```
 
 #### From Local Chart
@@ -857,7 +857,7 @@ The chart can inject an [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-pro
 
 ### Step 1 — Create the credentials secret
 
-Add to the app's manifest file (e.g. `myapp.yaml` referenced by `EXTRA_MANIFEST_FILE` in `.gitlab-ci.yml`):
+Add to the app's manifest file (e.g. `myapp.yaml` referenced by `EXTRA_MANIFEST_FILE` in your deploy pipeline):
 
 ```yaml
 apiVersion: v1
@@ -1174,13 +1174,14 @@ helm template test . -f examples/env-secrets.yaml
 
 ### CI/CD Testing
 
-The GitLab CI pipeline automatically runs:
-- **Lint**: Chart syntax and template validation
-- **Unit Tests**: helm-unittest validation
-- **Example Tests**: All example configurations
-- **Integration Tests**: chart-testing validation
-- **Package**: Chart packaging
-- **Deploy**: OCI registry deployment
+GitHub Actions runs, on every pull request and push:
+- **Lint**: chart syntax and template validation, every example rendered
+- **Unit Tests**: helm-unittest
+- **Feature checks**: the example-specific assertions below
+- **Install test**: a real install into a kind cluster
+- **Integration Tests**: chart-testing (`ct lint` + `ct install`)
+
+A `X.Y.Z` tag packages the chart and pushes it to `oci://ghcr.io/sharkops-io/charts`.
 
 ## Development
 
@@ -1208,22 +1209,19 @@ helm install --dry-run --debug test-release .
 
 ### CI/CD
 
-This chart includes GitLab CI configuration for:
-
-- Linting and unit testing
-- Chart testing with example values
-- Integration testing with chart-testing
-- OCI chart packaging and deployment to GitLab Container Registry
+CI is `.github/workflows/ci.yml`, a short caller of the shared
+[sharkops-io/.github](https://github.com/sharkops-io/.github) workflows plus this
+chart's own install and feature tests.
 
 ## Repository
 
-- **Source Code**: [https://gitlab.com/sharkops/helm-charts/sharkops-universal](https://gitlab.com/sharkops/helm-charts/sharkops-universal)
-- **Issues**: [GitLab Issues](https://gitlab.com/sharkops/helm-charts/sharkops-universal/-/issues)
-- **Merge Requests**: [GitLab Merge Requests](https://gitlab.com/sharkops/helm-charts/sharkops-universal/-/merge_requests)
+- **Source Code**: [github.com/sharkops-io/sharkops-universal](https://github.com/sharkops-io/sharkops-universal)
+- **Issues**: [GitHub Issues](https://github.com/sharkops-io/sharkops-universal/issues)
+- **Pull Requests**: [GitHub Pull Requests](https://github.com/sharkops-io/sharkops-universal/pulls)
 
 ## Contributing
 
-1. Fork the repository on GitLab
+1. Fork the repository on GitHub
 2. Create a feature branch
 3. Make your changes
 4. Add tests for new functionality
@@ -1232,4 +1230,5 @@ This chart includes GitLab CI configuration for:
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+
+Apache License 2.0. See [LICENSE](LICENSE).

@@ -1,0 +1,63 @@
+# Shared steps live in sharkops-io/.github; this file only says which run.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["[0-9]*.[0-9]*.[0-9]*"]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    uses: sharkops-io/.github/.github/workflows/secret-scan.yml@main
+  chart:
+    needs: [secret-scan]
+    uses: sharkops-io/.github/.github/workflows/chart.yml@main
+    permissions:
+      contents: read
+      packages: write
+
+  # This chart's own checks, kept here because only this chart has them.
+  features:
+    needs: [secret-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.1
+      - name: Feature assertions on the examples
+        run: |
+          set -euo pipefail
+          helm template t . --set persistence.enabled=true | grep -q "kind: PersistentVolumeClaim"
+          test "$(helm template t . -f examples/existing-pvc.yaml | grep -c 'kind: PersistentVolumeClaim' || true)" = 0
+          helm template t . -f examples/simple-env.yaml | grep -qE "configMapRef|secretKeyRef"
+          helm template t . -f examples/envfrom.yaml | grep -q "envFrom:"
+          helm template t . -f examples/env-secrets.yaml | grep -qE "ssl-certs|config-files"
+          helm template t . -f examples/tautulli.yaml > /dev/null
+
+  install:
+    needs: [secret-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.1
+      - uses: helm/kind-action@v1
+      - name: Install into kind and wait for it
+        run: |
+          helm install test-release . --wait --timeout 5m \
+            --set image.repository=nginxinc/nginx-unprivileged --set image.tag=alpine \
+            --set 'service.ports[0].port=8080' --set 'service.ports[0].targetPort=8080' \
+            --set 'livenessProbe.httpGet.port=8080' --set 'readinessProbe.httpGet.port=8080'
+          kubectl get all
