@@ -311,14 +311,16 @@ spec:
           image: "{{ .Values.oauth2proxy.image.repository }}:{{ .Values.oauth2proxy.image.tag }}"
           args:
             - --provider=oidc
-            - --oidc-issuer-url={{ .Values.oauth2proxy.issuerUrl }}
+            - --oidc-issuer-url={{ required "oauth2proxy.issuerUrl is required when oauth2proxy.enabled is true" .Values.oauth2proxy.issuerUrl }}
             - --client-id={{ .Values.oauth2proxy.clientId }}
             - --redirect-url={{ .Values.oauth2proxy.redirectUrl }}
             - --upstream=http://localhost:{{ (index .Values.service.ports 0).targetPort }}
             - --http-address=[::]:4180
             - --email-domain=*
-            - --cookie-domain={{ .Values.oauth2proxy.cookieDomain }}
-            - --whitelist-domain={{ .Values.oauth2proxy.cookieDomain }}
+            {{- with .Values.oauth2proxy.cookieDomain }}
+            - --cookie-domain={{ . }}
+            - --whitelist-domain={{ . }}
+            {{- end }}
             - --cookie-secure=true
             - --skip-provider-button=true
             - --reverse-proxy=true

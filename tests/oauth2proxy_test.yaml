@@ -30,6 +30,7 @@ tests:
           protocol: TCP
       oauth2proxy.enabled: true
       oauth2proxy.existingSecret: oauth2-proxy-credentials
+      oauth2proxy.issuerUrl: https://auth.example.com
       oauth2proxy.redirectUrl: https://test.example.com/oauth2/callback
     asserts:
       - lengthEqual:
@@ -51,6 +52,7 @@ tests:
           protocol: TCP
       oauth2proxy.enabled: true
       oauth2proxy.existingSecret: oauth2-proxy-credentials
+      oauth2proxy.issuerUrl: https://auth.example.com
       oauth2proxy.redirectUrl: https://test.example.com/oauth2/callback
     asserts:
       - equal:
@@ -71,3 +73,71 @@ tests:
       - equal:
           path: spec.ports[0].targetPort
           value: 8080
+
+  - it: should pass the issuer and scope cookie and redirect whitelist to cookieDomain
+    template: deployment.yaml
+    set:
+      image.repository: test/app
+      image.tag: latest
+      service.ports:
+        - name: http
+          port: 8080
+          targetPort: 8080
+          protocol: TCP
+      oauth2proxy.enabled: true
+      oauth2proxy.existingSecret: oauth2-proxy-credentials
+      oauth2proxy.issuerUrl: https://auth.example.com
+      oauth2proxy.redirectUrl: https://test.example.com/oauth2/callback
+      oauth2proxy.cookieDomain: .example.com
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].args
+          content: --oidc-issuer-url=https://auth.example.com
+      - contains:
+          path: spec.template.spec.containers[1].args
+          content: --cookie-domain=.example.com
+      - contains:
+          path: spec.template.spec.containers[1].args
+          content: --whitelist-domain=.example.com
+
+  # Empty cookieDomain (the default) must omit both flags rather than render
+  # `--cookie-domain=`; oauth2-proxy then scopes the cookie to the app's host.
+  - it: should omit --cookie-domain and --whitelist-domain when cookieDomain is empty
+    template: deployment.yaml
+    set:
+      image.repository: test/app
+      image.tag: latest
+      service.ports:
+        - name: http
+          port: 8080
+          targetPort: 8080
+          protocol: TCP
+      oauth2proxy.enabled: true
+      oauth2proxy.existingSecret: oauth2-proxy-credentials
+      oauth2proxy.issuerUrl: https://auth.example.com
+      oauth2proxy.redirectUrl: https://test.example.com/oauth2/callback
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[1].args
+          content: --cookie-domain=
+      - notContains:
+          path: spec.template.spec.containers[1].args
+          content: --whitelist-domain=
+
+  # No default issuer: a guessed one would only fail at login time.
+  - it: should fail to render the sidecar without issuerUrl
+    template: deployment.yaml
+    set:
+      image.repository: test/app
+      image.tag: latest
+      service.ports:
+        - name: http
+          port: 8080
+          targetPort: 8080
+          protocol: TCP
+      oauth2proxy.enabled: true
+      oauth2proxy.existingSecret: oauth2-proxy-credentials
+      oauth2proxy.redirectUrl: https://test.example.com/oauth2/callback
+    asserts:
+      - failedTemplate:
+          errorPattern: "oauth2proxy.issuerUrl is required"
