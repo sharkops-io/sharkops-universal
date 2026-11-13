@@ -72,6 +72,7 @@ tests:
       oauth2proxy:
         enabled: true
         existingSecret: oauth2-secret
+        issuerUrl: https://auth.example.com
     asserts:
       - equal:
           path: spec.template.spec.containers[1].name

@@ -8,8 +8,8 @@ home: https://github.com/sharkops-io/sharkops-universal
 sources:
   - https://github.com/sharkops-io/sharkops-universal
 maintainers:
-  - name: Andrew Landsverk
-    email: noreply@example.com
+  - name: sharkops-io
+    url: https://github.com/sharkops-io
 keywords:
   - docker
   - container

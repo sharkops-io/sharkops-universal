@@ -840,24 +840,24 @@ persistence:
         existingClaim: "my-existing-media-pvc"  # Use existing PVC for media
 ```
 
-## oauth2-proxy Sidecar (Authelia SSO)
+## oauth2-proxy Sidecar (OIDC SSO)
 
-The chart can inject an [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) sidecar to protect any app with Authelia OIDC authentication. When enabled, the sidecar intercepts all traffic at the pod level before it reaches the app — no ingress annotation changes required.
+The chart can inject an [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) sidecar to protect any app with OIDC authentication against any issuer (Authelia, Authentik, Keycloak, ...). When enabled, the sidecar intercepts all traffic at the pod level before it reaches the app — no ingress annotation changes required.
 
 **How it works:**
 - The sidecar listens on port 4180 and proxies authenticated requests to `localhost:<app port>`
 - The Kubernetes Service's `targetPort` is automatically overridden to 4180
 - The ingress config stays unchanged (still points to the same service port number)
-- A shared `.example.com` cookie means login once = access to all protected services
+- Setting `cookieDomain` to a parent domain (e.g. `.example.com`) shares one login across every protected service; left empty, each app keeps its own cookie
 
 ### Prerequisites
 
-1. Authelia must be running with the `oauth2-proxy` OIDC client configured (see `authelia/values.yaml`)
+1. An OIDC issuer with an `oauth2-proxy` client (or whatever `oauth2proxy.clientId` names) configured
 2. The `oauth2-proxy-credentials` secret must exist in the **app's namespace**
 
 ### Step 1 — Create the credentials secret
 
-Add to the app's manifest file (e.g. `myapp.yaml` referenced by `EXTRA_MANIFEST_FILE` in your deploy pipeline):
+Create it in the app's namespace, ideally through `externalSecrets` rather than committing it:
 
 ```yaml
 apiVersion: v1
@@ -866,24 +866,28 @@ metadata:
   name: oauth2-proxy-credentials
   namespace: <your-app-namespace>
 stringData:
-  client-secret: "<same value as authelia namespace>"
-  cookie-secret: "<same value as authelia namespace>"
+  client-secret: "<the OIDC client secret>"
+  cookie-secret: "<32 random bytes, base64url>"
 ```
+
+If several apps share a `cookieDomain`, they must all use the same `cookie-secret`.
 
 ### Step 2 — Enable in values.yaml
 
 ```yaml
 oauth2proxy:
   enabled: true
-  redirectUrl: https://yourapp.example.com/oauth2/callback
+  issuerUrl: https://auth.example.com                        # required
+  redirectUrl: https://yourapp.example.com/oauth2/callback   # required
+  cookieDomain: .example.com                                 # optional
 ```
 
-### Step 3 — Register the redirect URI in Authelia
+### Step 3 — Register the redirect URI with your IdP
 
-Add one line to `authelia/values.yaml` under `configMap.identity_providers.oidc.clients[0].redirect_uris`:
+Add the app's callback URL to the OIDC client's allowed redirect URIs:
 
-```yaml
-- https://yourapp.example.com/oauth2/callback
+```
+https://yourapp.example.com/oauth2/callback
 ```
 
 ### Configuration reference
@@ -893,10 +897,10 @@ Add one line to `authelia/values.yaml` under `configMap.identity_providers.oidc.
 | `oauth2proxy.enabled` | Inject the oauth2-proxy sidecar | `false` |
 | `oauth2proxy.image.repository` | oauth2-proxy image | `quay.io/oauth2-proxy/oauth2-proxy` |
 | `oauth2proxy.image.tag` | oauth2-proxy image tag | `v7.9.0` |
-| `oauth2proxy.issuerUrl` | Authelia OIDC issuer URL | `https://auth.example.com` |
+| `oauth2proxy.issuerUrl` | OIDC issuer URL — **required when enabled** (e.g. `https://auth.example.com`) | `""` |
 | `oauth2proxy.clientId` | OIDC client ID | `oauth2-proxy` |
 | `oauth2proxy.redirectUrl` | Callback URL for this app — **required when enabled** | `""` |
-| `oauth2proxy.cookieDomain` | Shared cookie domain | `.example.com` |
+| `oauth2proxy.cookieDomain` | Shared cookie domain and post-login redirect whitelist (e.g. `.example.com`). Empty omits `--cookie-domain` and `--whitelist-domain` | `""` |
 | `oauth2proxy.existingSecret` | Secret name with `client-secret` and `cookie-secret` keys | `oauth2-proxy-credentials` |
 
 ### Full example
@@ -931,7 +935,9 @@ ingress:
 
 oauth2proxy:
   enabled: true
+  issuerUrl: https://auth.example.com
   redirectUrl: https://sonarr.example.com/oauth2/callback
+  cookieDomain: .example.com
 ```
 
 ---

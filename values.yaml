@@ -283,14 +283,14 @@ containerSecurityContext: {}
 # from variables prefixed with its own name -- then the SERVICE NAME collides
 # with the app's config namespace.
 #
-# Trilium hit this on 2026-08-30 and crash-looped on startup:
+# Trilium, for example, crash-loops on startup:
 #
 #   FATAL ERROR: Invalid port value "tcp://10.102.169.151:80" from environment
 #   variable TRILIUM_PORT, should be an integer between 0 and 65536.
 #
 # Set false for any app whose env vars share a prefix with its Service name.
-# Nothing in this cluster is known to depend on service links -- they predate
-# cluster DNS -- but the default stays true so existing releases are untouched.
+# Few apps depend on service links -- they predate cluster DNS -- but the
+# default stays true so existing releases are untouched.
 #
 # Only `false` renders. Leaving it true emits nothing, because emitting the
 # Kubernetes default would change every consumer's pod template and roll them.
@@ -527,24 +527,27 @@ extraContainers: []
   #     - name: SOME_VAR
   #       value: "some-value"
 
-# oauth2-proxy sidecar — adds authentication to any sharkops-universal app
+# oauth2-proxy sidecar — adds OIDC authentication to any sharkops-universal app
 #
 # HOW TO ENABLE ON AN APP:
-#   1. Create the credentials secret in the app's namespace (add to the app's EXTRA_MANIFEST_FILE):
+#   1. Create the credentials secret in the app's namespace (ideally via
+#      externalSecrets below rather than committing it):
 #        apiVersion: v1
 #        kind: Secret
 #        metadata:
 #          name: oauth2-proxy-credentials
 #          namespace: <your-app-namespace>
 #        stringData:
-#          client-secret: "same value as authelia namespace"
-#          cookie-secret: "same value as authelia namespace"
+#          client-secret: "<the OIDC client secret>"
+#          cookie-secret: "<32 random bytes, base64url>"
 #   2. Add to the app's values.yaml:
 #        oauth2proxy:
 #          enabled: true
+#          issuerUrl: https://auth.example.com
 #          redirectUrl: https://yourapp.example.com/oauth2/callback
-#   3. Add the app's callback URL to authelia/values.yaml under
-#      configMap.identity_providers.oidc.clients[0].redirect_uris:
+#          cookieDomain: .example.com  # optional: one login across hosts
+#   3. Register the app's callback URL as a redirect URI on the OIDC client in
+#      your IdP:
 #        - https://yourapp.example.com/oauth2/callback
 #
 # NOTE: The ingress config does NOT change — keep pointing to the original service port.
@@ -554,10 +557,13 @@ oauth2proxy:
   image:
     repository: quay.io/oauth2-proxy/oauth2-proxy
     tag: v7.15.6
-  issuerUrl: https://auth.example.com
+  issuerUrl: ""  # Required when enabled, e.g. https://auth.example.com
   clientId: oauth2-proxy
   redirectUrl: ""  # Required when enabled: https://yourapp.example.com/oauth2/callback
-  cookieDomain: .example.com
+  # Parent domain for a shared login cookie, e.g. .example.com. Also used as
+  # the post-login redirect whitelist. Empty omits both flags and scopes the
+  # cookie to the app's own host.
+  cookieDomain: ""
   # Secret name in the app's namespace with keys: client-secret, cookie-secret
   existingSecret: oauth2-proxy-credentials
   # Example:
@@ -579,7 +585,7 @@ oauth2proxy:
 # CREATES the Secret changes.
 #
 # Pair with deploymentAnnotations below: ESO updates the Secret in place when a
-# value is rotated in OpenBao, and nothing about that changes the Deployment, so
+# value is rotated in the secret store, and nothing about that changes the Deployment, so
 # without Reloader the pod keeps serving the old value indefinitely. The
 # checksum/extra-config annotation does NOT help - it hashes extraObjects, and
 # an ESO-managed Secret is created outside Helm entirely.
@@ -627,22 +633,22 @@ extraObjects: []
 # RELATIVE and walked through the three-entry search path first. So
 # `sonarr.plex.svc.cluster.local` (four dots) and Plex's
 # `<ip>.<hash>.plex.direct` (three dots) each cost THREE NXDOMAIN lookups before
-# the real answer. Measured 2026-08-20: 75% of one app's DNS requests were
+# the real answer. In one measured cluster, 75% of one app's DNS requests were
 # wasted search expansions, and NXDOMAIN was ~72% of all cluster DNS responses.
 #
 # ndots CANNOT be fixed server-side. It is a client resolver setting, and the
 # decision is made before a packet exists -- CoreDNS only ever sees the query the
-# client already committed to. CoreDNS `autopath` is the partial workaround and
-# is deployed, but it cannot help clients that emit every search variant anyway,
-# which is what the musl/Alpine images in this cluster do.
+# client already committed to. CoreDNS `autopath` is the partial workaround, but
+# it cannot help clients that emit every search variant anyway, which is what
+# musl/Alpine-based images do.
 #
 # `ndots: 2` is the safe setting, NOT lower. Short names keep working: `sonarr`
 # (0 dots) still uses the search path and hits on its first expansion, and
 # `sonarr.plex` (1 dot) is unchanged. Only names with two or more dots become
 # absolute-first -- exactly the class that was being wasted.
 #
-# Proven on tautulli: search-expanded requests went 75% -> 0%, and the namespace's
-# NXDOMAIN rate fell ~95%.
+# On a Tautulli pod, search-expanded requests went 75% -> 0%, and the
+# namespace's NXDOMAIN rate fell ~95%.
 #
 #   dnsConfig:
 #     options:
