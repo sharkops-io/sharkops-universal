@@ -2,6 +2,30 @@ suite: test deployment
 templates:
   - deployment.yaml
 tests:
+  - it: names the deployment from fullnameOverride when it is set
+    set:
+      fullnameOverride: my-app
+      image:
+        repository: ghcr.io/example/my-app
+        tag: latest
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-app
+
+  - it: keeps the release-image deployment name when only nameOverride is set
+    release:
+      name: my-app
+    set:
+      nameOverride: my-app
+      image:
+        repository: ghcr.io/example/my-app
+        tag: latest
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-app-my-app
+
   - it: should create a deployment with correct metadata
     set:
       image:

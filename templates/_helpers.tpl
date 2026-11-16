@@ -94,10 +94,14 @@ Create a short app name based on the image repository
 {{- end }}
 
 {{/*
-Create a short deployment name based on the image repository
+Deployment name. fullnameOverride wins, so one value names every object in the
+release. Otherwise it is <release>-<last segment of image.repository>, kept as
+the default so existing releases keep their Deployment names.
 */}}
 {{- define "common.names.deploymentName" -}}
-{{- if .Values.image.repository }}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else if .Values.image.repository }}
 {{- $appName := include "common.names.appName" . }}
 {{- printf "%s-%s" .Release.Name $appName | trunc 63 | trimSuffix "-" }}
 {{- else }}

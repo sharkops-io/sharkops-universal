@@ -78,7 +78,7 @@ helm install my-app ./sharkops-universal \
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `nameOverride` | Override the chart name | `""` |
-| `fullnameOverride` | Override the full name | `""` |
+| `fullnameOverride` | Override the full name. Also names the Deployment, which is otherwise `<release>-<last segment of image.repository>` | `""` |
 
 ### Image Configuration
 
