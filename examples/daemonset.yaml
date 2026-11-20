@@ -96,7 +96,6 @@ resources:
     cpu: 40m
     memory: 45Mi
   limits:
-    cpu: 100m
     memory: 90Mi
 
 # The chart's LinuxServer.io-shaped PUID/PGID/TZ defaults mean nothing to this
