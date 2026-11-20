@@ -304,10 +304,13 @@ enableServiceLinks: true
 priorityClassName: ""
 
 # Resources
-# Uncomment and adjust as needed for your workload
+# Uncomment and adjust as needed for your workload.
+# Set a CPU request, but usually no CPU limit: a limit makes the kernel
+# throttle the container (CFS quota) even when the node has idle cores, which
+# shows up as latency. The request already guarantees its share under
+# contention. Keep a memory limit, since memory cannot be throttled.
 # resources:
 #   limits:
-#     cpu: 500m
 #     memory: 512Mi
 #   requests:
 #     cpu: 100m

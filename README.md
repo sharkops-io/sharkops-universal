@@ -658,6 +658,8 @@ priorityClassName: system-node-critical
 | `resources.requests.cpu` | CPU request | Optional |
 | `resources.requests.memory` | Memory request | Optional |
 
+Recommended: set CPU and memory requests and a memory limit, and leave out `resources.limits.cpu`. A CPU limit makes the kernel throttle the container even when the node has idle cores, while the CPU request already guarantees its share when the node is busy.
+
 ### Node Selector
 
 | Parameter | Description | Default |
