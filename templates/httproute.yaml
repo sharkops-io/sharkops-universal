@@ -1,0 +1,57 @@
+{{- /*
+Gateway API HTTPRoute for the chart's Service, next to (or instead of) the
+Ingress. Off by default; see `httpRoute` in values.yaml.
+
+No `.Capabilities.APIVersions` gate: if the Gateway API CRDs are missing, the
+apply should fail loudly rather than quietly drop the route.
+
+backendRefs default to the first `service.ports` entry (its Service and
+port), the same target the Ingress uses, so the common case is just
+`parentRefs` + `hostnames`. A rule with its own `backendRefs` keeps them.
+*/ -}}
+{{- if .Values.httpRoute.enabled }}
+{{- if not .Values.httpRoute.parentRefs }}
+{{- fail "httpRoute.enabled needs at least one entry in httpRoute.parentRefs (the Gateway to attach to)" }}
+{{- end }}
+{{- $first := index .Values.service.ports 0 }}
+{{- $backend := list (dict "name" ($first.serviceName | default (include "common.names.fullname" .)) "port" (int $first.port)) }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+    {{- with .Values.httpRoute.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
+  {{- with .Values.httpRoute.hostnames }}
+  hostnames:
+    {{- range . }}
+    - {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- if .Values.httpRoute.rules }}
+    {{- range .Values.httpRoute.rules }}
+    {{- $rule := deepCopy . }}
+    {{- if not $rule.backendRefs }}
+    {{- $_ := set $rule "backendRefs" $backend }}
+    {{- end }}
+    - {{- toYaml $rule | nindent 6 }}
+    {{- end }}
+    {{- else }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        {{- toYaml $backend | nindent 8 }}
+    {{- end }}
+{{- end }}

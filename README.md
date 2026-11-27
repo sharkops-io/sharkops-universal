@@ -17,6 +17,7 @@ A universal Helm chart for deploying any Docker container on Kubernetes. This ch
 - **Persistence Options**: Flexible volume management with existing PVC support
 - **GPU Support**: Runtime class and extra volume configuration for NVIDIA GPU workloads
 - **Prometheus Metrics**: Optional ServiceMonitor for scraping by Prometheus Operator
+- **Gateway API**: Optional HTTPRoute, next to or instead of the Ingress
 
 ## Prerequisites
 
@@ -208,6 +209,35 @@ service:
 | `ingress.hosts[].paths[].servicePort` | Service port to route to (optional) | Uses first service port |
 | `ingress.tls` | Ingress TLS configuration | `[]` |
 | `additionalIngresses` | Additional ingress resources for other ports | `[]` |
+
+### Gateway API (HTTPRoute)
+
+An HTTPRoute that attaches the app to an existing Gateway, next to or instead of the Ingress. Needs the Gateway API CRDs (`gateway.networking.k8s.io/v1`).
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `httpRoute.enabled` | Create an HTTPRoute | `false` |
+| `httpRoute.parentRefs` | Gateway(s) to attach to (`name`, `namespace`, `sectionName`). Required when enabled | `[]` |
+| `httpRoute.hostnames` | Host names the route answers. Empty: every host the listener accepts | `[]` |
+| `httpRoute.rules` | Route rules. Empty: one rule, `PathPrefix /`, to the first `service.ports` entry. A rule without `backendRefs` gets that same backend | `[]` |
+| `httpRoute.annotations` | Annotations on the HTTPRoute | `{}` |
+| `httpRoute.labels` | Extra labels on the HTTPRoute | `{}` |
+
+```yaml
+ingress:
+  enabled: false
+
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - app.example.com
+```
+
+TLS belongs to the Gateway's listener, so there is no per-app certificate. The listener's `allowedRoutes` must admit the release's namespace, or the route is created and never `Accepted`. See `examples/httproute.yaml`.
 
 ### Custom Service Routing
 

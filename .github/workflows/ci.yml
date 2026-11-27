@@ -41,6 +41,8 @@ jobs:
           helm template t . -f examples/envfrom.yaml | grep -q "envFrom:"
           helm template t . -f examples/env-secrets.yaml | grep -qE "ssl-certs|config-files"
           helm template t . -f examples/tautulli.yaml > /dev/null
+          helm template t . -f examples/httproute.yaml | grep -q "kind: HTTPRoute"
+          test "$(helm template t . -f examples/httproute.yaml | grep -c 'kind: Ingress' || true)" = 0
 
   install:
     needs: [secret-scan]
