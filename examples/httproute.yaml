@@ -1,0 +1,35 @@
+# Serving an app through a Gateway API Gateway instead of an Ingress.
+#
+# The HTTPRoute attaches to an existing Gateway listener (parentRefs) and, with
+# no `rules`, sends every path to the first service.ports entry. The Gateway
+# owns TLS (for example a wildcard certificate on its https listener), so there
+# is no per-app certificate here.
+#
+# The listener must allow routes from this namespace (allowedRoutes), or the
+# route is created and then never Accepted:
+#   kubectl get httproute <name> -o jsonpath='{.status.parents[0].conditions}'
+
+nameOverride: whoami
+
+image:
+  repository: traefik/whoami
+  tag: v1.11.0
+
+service:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+
+ingress:
+  enabled: false
+
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - whoami.example.com

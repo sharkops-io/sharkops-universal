@@ -142,6 +142,24 @@ ingress:
           # servicePort: 8080               # Optional: use different port
   tls: []
 
+# Gateway API HTTPRoute, next to (or instead of) the Ingress. Needs the Gateway
+# API CRDs (gateway.networking.k8s.io/v1) and a Gateway to attach to.
+httpRoute:
+  enabled: false
+  # Required when enabled: the Gateway (and listener) to attach to, e.g.
+  #   - name: my-gateway
+  #     namespace: gateway-system
+  #     sectionName: https
+  parentRefs: []
+  # Host names the route answers, e.g. [app.example.com]. Empty: every host
+  # the listener accepts.
+  hostnames: []
+  # Optional rules. Empty: one rule, PathPrefix /, to the first service.ports
+  # entry. A rule without its own backendRefs gets that same backend.
+  rules: []
+  annotations: {}
+  labels: {}
+
 # Additional ingress resources for other ports
 additionalIngresses: []
   # Example:

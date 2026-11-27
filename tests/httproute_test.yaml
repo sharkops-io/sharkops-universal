@@ -1,0 +1,146 @@
+suite: test httproute
+templates:
+  - httproute.yaml
+tests:
+  - it: should not create an HTTPRoute by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should fail when enabled without parentRefs
+    set:
+      httpRoute.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "httpRoute.enabled needs at least one entry in httpRoute.parentRefs (the Gateway to attach to)"
+
+  - it: should route / to the first service port by default
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: lan
+          namespace: gateway-system
+          sectionName: https
+      httpRoute.hostnames:
+        - app.example.com
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HTTPRoute
+      - isAPIVersion:
+          of: gateway.networking.k8s.io/v1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME
+      - equal:
+          path: spec.parentRefs
+          value:
+            - name: lan
+              namespace: gateway-system
+              sectionName: https
+      - equal:
+          path: spec.hostnames
+          value:
+            - app.example.com
+      - equal:
+          path: spec.rules
+          value:
+            - matches:
+                - path:
+                    type: PathPrefix
+                    value: /
+              backendRefs:
+                - name: RELEASE-NAME
+                  port: 80
+
+  - it: should leave hostnames out when none are given
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: lan
+    asserts:
+      - notExists:
+          path: spec.hostnames
+
+  - it: should follow the first port's port and serviceName
+    set:
+      service.ports:
+        - name: http
+          port: 8787
+          targetPort: 8787
+          serviceName: custom-web
+        - name: metrics
+          port: 9090
+          targetPort: 9090
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: lan
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - name: custom-web
+              port: 8787
+
+  - it: should give custom rules the default backend and keep their own
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: lan
+      httpRoute.rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /api
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /other
+          backendRefs:
+            - name: other-svc
+              port: 9000
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - name: RELEASE-NAME
+              port: 80
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /api
+      - equal:
+          path: spec.rules[1].backendRefs
+          value:
+            - name: other-svc
+              port: 9000
+
+  - it: should add annotations and extra labels
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: lan
+      httpRoute.annotations:
+        gethomepage.dev/enabled: "true"
+      httpRoute.labels:
+        team: media
+    asserts:
+      - equal:
+          path: metadata.annotations["gethomepage.dev/enabled"]
+          value: "true"
+      - equal:
+          path: metadata.labels.team
+          value: media
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
+
+  - it: should render alongside the Ingress
+    set:
+      ingress.enabled: true
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: lan
+    asserts:
+      - hasDocuments:
+          count: 1
